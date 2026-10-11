@@ -51,6 +51,39 @@ describe('useHealthData', () => {
     expect(result.current.entries[0]!.weightKg).toBe(80);
   });
 
+  it('replaces the whole entry for a date when editing', () => {
+    const { result, storage } = setup();
+    act(() => {
+      result.current.upsertEntry({ date: REFERENCE, weightKg: 80, steps: 9000 });
+    });
+    act(() => {
+      result.current.replaceEntry({ date: REFERENCE, steps: 100 }, REFERENCE);
+    });
+
+    // Unlike `upsertEntry`, a replaced entry drops fields that are no longer
+    // given, so a cleared form field actually removes the stored value.
+    expect(result.current.entries).toEqual([{ date: REFERENCE, steps: 100 }]);
+    expect(storage.getItem(STORAGE_KEYS.entries)).toContain('"steps":100');
+    expect(storage.getItem(STORAGE_KEYS.entries)).not.toContain('weightKg');
+  });
+
+  it('moves an entry to its new date on replace', () => {
+    const { result } = setup();
+    act(() => {
+      result.current.upsertEntry({ date: '2024-03-10', weightKg: 80 });
+      result.current.upsertEntry({ date: '2024-03-11', steps: 9000 });
+    });
+    act(() => {
+      result.current.replaceEntry({ date: '2024-03-12', weightKg: 81 }, '2024-03-10');
+    });
+
+    // The edited entry leaves its old date behind and lands on the new one.
+    expect(result.current.entries).toEqual([
+      { date: '2024-03-11', steps: 9000 },
+      { date: '2024-03-12', weightKg: 81 },
+    ]);
+  });
+
   it('keeps one entry per date', () => {
     const { result } = setup();
     act(() => {

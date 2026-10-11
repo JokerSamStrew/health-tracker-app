@@ -7,6 +7,7 @@ import { METRIC_KEYS, METRIC_UNITS } from '../types.ts';
 
 export interface HistoryTableProps {
   entries: DailyEntry[];
+  onEdit: (entry: DailyEntry) => void;
   onDelete: (date: string) => void;
 }
 
@@ -26,7 +27,7 @@ function cell(entry: DailyEntry, key: MetricKey): string {
   return formatMetric(value, DIGITS[key]);
 }
 
-export function HistoryTable({ entries, onDelete }: HistoryTableProps) {
+export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
   const [query, setQuery] = useState('');
 
   const sorted = useMemo(() => [...entries].reverse(), [entries]);
@@ -93,14 +94,24 @@ export function HistoryTable({ entries, onDelete }: HistoryTableProps) {
                   ))}
                   <td className="history__note">{entry.note ?? ''}</td>
                   <td>
-                    <button
-                      type="button"
-                      className="button button--danger"
-                      onClick={() => onDelete(entry.date)}
-                      aria-label={`Delete entry for ${formatLongDate(entry.date)}`}
-                    >
-                      Delete
-                    </button>
+                    <div className="history__actions">
+                      <button
+                        type="button"
+                        className="button button--ghost"
+                        onClick={() => onEdit(entry)}
+                        aria-label={`Edit entry for ${formatLongDate(entry.date)}`}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="button button--danger"
+                        onClick={() => onDelete(entry.date)}
+                        aria-label={`Delete entry for ${formatLongDate(entry.date)}`}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

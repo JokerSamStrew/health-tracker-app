@@ -19,6 +19,12 @@ export interface UseHealthData {
   report: HealthReport;
   /** Adds or partially updates the entry for a date. */
   upsertEntry: (entry: DailyEntry) => void;
+  /**
+   * Replaces the entry that currently lives at `previousDate` (used when
+   * editing). The saved entry replaces it outright, so cleared form fields are
+   * dropped; an entry moved to a new date merges into that day if it exists.
+   */
+  replaceEntry: (entry: DailyEntry, previousDate: string) => void;
   removeEntry: (date: string) => void;
   updateProfile: (patch: Profile) => void;
   /** Replaces all current entries and profile with an imported backup. */
@@ -60,6 +66,14 @@ export function useHealthData(
     setEntries((current) => mergeEntries(current, [entry]));
   }, []);
 
+  // Editing is a full replace, not a merge: clearing a field in the form must
+  // remove that field from the stored entry, which `upsertEntry` cannot do.
+  // The original date is dropped first so a same-day edit starts from scratch,
+  // while moving the entry onto another date merges into whatever is there.
+  const replaceEntry = useCallback((entry: DailyEntry, previousDate: string) => {
+    setEntries((current) => mergeEntries(current.filter((e) => e.date !== previousDate), [entry]));
+  }, []);
+
   const removeEntry = useCallback((date: string) => {
     setEntries((current) => current.filter((entry) => entry.date !== date));
   }, []);
@@ -94,6 +108,7 @@ export function useHealthData(
     profile,
     report,
     upsertEntry,
+    replaceEntry,
     removeEntry,
     updateProfile,
     importData,

@@ -266,6 +266,73 @@ describe('EntryForm', () => {
     await user.click(screen.getByRole('button', { name: 'Sad' }));
     expect(screen.getByLabelText(/note/i)).toHaveValue('Sad');
   });
+
+  it('pre-fills the form when editing an entry', () => {
+    render(
+      <EntryForm
+        defaultDate={REFERENCE}
+        editingEntry={{
+          date: '2024-03-10',
+          weightKg: 81.4,
+          steps: 10500,
+          sleepQuality: 4,
+          calories: 2400,
+          note: 'Long run',
+        }}
+        onSave={vi.fn()}
+        onCancelEdit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: /edit entry/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^date/i)).toHaveValue('2024-03-10');
+    expect(screen.getByLabelText(/weight/i)).toHaveValue(81.4);
+    expect(screen.getByLabelText(/^steps/i)).toHaveValue(10500);
+    expect(screen.getByLabelText(/sleep quality/i)).toHaveValue('4');
+    expect(screen.getByLabelText(/calories eaten/i)).toHaveValue(2400);
+    expect(screen.getByLabelText(/note/i)).toHaveValue('Long run');
+    // A single entry is never edited as a range.
+    expect(screen.queryByLabelText(/period/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /update entry/i })).toBeInTheDocument();
+  });
+
+  it('replaces the whole entry on save, dropping cleared fields', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <EntryForm
+        defaultDate={REFERENCE}
+        editingEntry={{ date: '2024-03-10', steps: 9000, note: 'Rest day' }}
+        onSave={onSave}
+        onCancelEdit={vi.fn()}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText(/^steps/i));
+    await user.click(screen.getByRole('button', { name: /update entry/i }));
+
+    // Clearing a field removes it from the saved entry instead of merging over
+    // the old value; the parent replaces the whole day with this result.
+    expect(onSave).toHaveBeenCalledWith({ date: '2024-03-10', note: 'Rest day' });
+  });
+
+  it('leaves edit mode via Cancel without saving', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onCancelEdit = vi.fn();
+    render(
+      <EntryForm
+        defaultDate={REFERENCE}
+        editingEntry={{ date: '2024-03-10', steps: 9000 }}
+        onSave={onSave}
+        onCancelEdit={onCancelEdit}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(onCancelEdit).toHaveBeenCalledTimes(1);
+    expect(onSave).not.toHaveBeenCalled();
+  });
 });
 
 describe('formToEntry', () => {
@@ -436,7 +503,7 @@ describe('InsightsPanel', () => {
 describe('HistoryTable', () => {
   it('lists entries newest first', () => {
     const entries = makeEntries(3);
-    render(<HistoryTable entries={entries} onDelete={vi.fn()} />);
+    render(<HistoryTable entries={entries} onEdit={vi.fn()} onDelete={vi.fn()} />);
 
     const rows = screen.getAllByRole('row').slice(1);
     expect(rows[0]).toHaveTextContent('Mar 14');
@@ -445,7 +512,7 @@ describe('HistoryTable', () => {
 
   it('shows a dash for missing metrics', () => {
     render(
-      <HistoryTable entries={[{ date: REFERENCE, weightKg: 80 }]} onDelete={vi.fn()} />,
+      <HistoryTable entries={[{ date: REFERENCE, weightKg: 80 }]} onEdit={vi.fn()} onDelete={vi.fn()} />,
     );
     const row = screen.getByRole('row', { name: /mar 14/i });
     expect(within(row).getAllByText('—').length).toBe(3);
@@ -457,7 +524,7 @@ describe('HistoryTable', () => {
       { date: REFERENCE, steps: 9000, note: 'long run' },
       { date: '2024-03-13', steps: 4000, note: 'rest day' },
     ];
-    render(<HistoryTable entries={entries} onDelete={vi.fn()} />);
+    render(<HistoryTable entries={entries} onEdit={vi.fn()} onDelete={vi.fn()} />);
 
     await user.type(screen.getByRole('searchbox'), 'rest');
 
@@ -465,17 +532,27 @@ describe('HistoryTable', () => {
     expect(screen.queryByText('long run')).not.toBeInTheDocument();
   });
 
+  it('hands the clicked entry to the edit callback', async () => {
+    const user = userEvent.setup();
+    const entries = makeEntries(1);
+    const onEdit = vi.fn();
+    render(<HistoryTable entries={entries} onEdit={onEdit} onDelete={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: /edit entry for/i }));
+    expect(onEdit).toHaveBeenCalledWith(entries[0]!);
+  });
+
   it('confirms deletion by date', async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
-    render(<HistoryTable entries={makeEntries(1)} onDelete={onDelete} />);
+    render(<HistoryTable entries={makeEntries(1)} onEdit={vi.fn()} onDelete={onDelete} />);
 
     await user.click(screen.getByRole('button', { name: /delete entry for/i }));
     expect(onDelete).toHaveBeenCalledWith(REFERENCE);
   });
 
   it('shows an empty state', () => {
-    render(<HistoryTable entries={[]} onDelete={vi.fn()} />);
+    render(<HistoryTable entries={[]} onEdit={vi.fn()} onDelete={vi.fn()} />);
     expect(screen.getByText(/no entries yet/i)).toBeInTheDocument();
   });
 });

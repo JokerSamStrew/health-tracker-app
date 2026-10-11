@@ -3,6 +3,7 @@ import {
   addDays,
   dateRange,
   daysBetween,
+  formatShortDate,
   fromISODate,
   toISODate,
 } from '../lib/date.ts';
@@ -12,7 +13,11 @@ import type { DailyEntry, MetricKey } from '../types.ts';
 export interface EntryFormProps {
   /** Defaults to today. */
   defaultDate?: string;
+  /** When set, the form edits this entry instead of logging a new one. */
+  editingEntry?: DailyEntry | null;
   onSave: (entry: DailyEntry) => void;
+  /** Request to leave edit mode without saving. Ignored when not editing. */
+  onCancelEdit?: () => void;
 }
 
 export type EntryPeriod = 'day' | 'range';
@@ -110,6 +115,21 @@ function emptyForm(today: string): FormState {
   };
 }
 
+/** Pre-fills the form with an existing entry so it can be edited. */
+function formFromEntry(entry: DailyEntry): FormState {
+  return {
+    period: 'day',
+    date: entry.date,
+    start: entry.date,
+    end: entry.date,
+    weightKg: entry.weightKg !== undefined ? String(entry.weightKg) : '',
+    steps: entry.steps !== undefined ? String(entry.steps) : '',
+    sleepQuality: entry.sleepQuality !== undefined ? String(entry.sleepQuality) : '',
+    calories: entry.calories !== undefined ? String(entry.calories) : '',
+    note: entry.note ?? '',
+  };
+}
+
 /** Keeps the chosen period and its pickers, clears the measurement values. */
 function clearMeasurements(current: FormState): FormState {
   return {
@@ -203,9 +223,11 @@ export function formToEntries(form: FormState): DailyEntry[] {
   return dates.map((date) => formToEntry({ ...form, date }));
 }
 
-export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
+export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEdit }: EntryFormProps) {
   const today = defaultDate ?? toISODate(new Date());
-  const [form, setForm] = useState<FormState>(() => emptyForm(today));
+  const [form, setForm] = useState<FormState>(() =>
+    editingEntry ? formFromEntry(editingEntry) : emptyForm(today),
+  );
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [saved, setSaved] = useState(false);
 
@@ -213,12 +235,14 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
   const [lastToday, setLastToday] = useState(today);
   if (today !== lastToday) {
     setLastToday(today);
-    setForm((current) => ({
-      ...current,
-      date: today,
-      start: today,
-      end: today,
-    }));
+    if (editingEntry === null) {
+      setForm((current) => ({
+        ...current,
+        date: today,
+        start: today,
+        end: today,
+      }));
+    }
   }
 
   const minDate = useMemo(() => addDays(today, -365 * 3), [today]);
@@ -275,35 +299,40 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
     setSaved(true);
   }
 
-  const savedMessage =
-    form.period === 'day'
+  const savedMessage = editingEntry
+    ? 'Saved. Entry updated.'
+    : form.period === 'day'
       ? 'Saved. Values merged into that day.'
       : `Saved. Applied to ${formToEntries(form).length} days in that range.`;
 
   return (
     <form className="card entry-form" onSubmit={handleSubmit} noValidate>
-      <h3>Log an entry</h3>
+      <h3>{editingEntry ? `Edit entry for ${formatShortDate(editingEntry.date)}` : 'Log an entry'}</h3>
 
       <div className="entry-form__row">
-        <label className="field">
-          <span>Period</span>
-          <select
-            value={form.period}
-            onChange={(event) => update('period', event.target.value as EntryPeriod)}
-          >
-            <option value="day">Exact date</option>
-            <option value="range">Custom range</option>
-          </select>
-        </label>
+        {editingEntry === null ? (
+          <label className="field">
+            <span>Period</span>
+            <select
+              value={form.period}
+              onChange={(event) => update('period', event.target.value as EntryPeriod)}
+            >
+              <option value="day">Exact date</option>
+              <option value="range">Custom range</option>
+            </select>
+          </label>
+        ) : null}
 
-        {form.period === 'day' ? (
+        {editingEntry !== null || form.period === 'day' ? (
           <label className="field">
             <span>Date</span>
             <input
               type="date"
               value={form.date}
-              min={minDate}
-              max={maxDate}
+              // Editing may target a day outside the 3-year picker window, so
+              // only constrain the date when logging a new entry.
+              min={editingEntry === null ? minDate : undefined}
+              max={editingEntry === null ? maxDate : undefined}
               onChange={(event) => update('date', event.target.value)}
               aria-invalid={errors.date ? 'true' : undefined}
               aria-describedby={errors.date ? 'entry-date-error' : undefined}
@@ -492,19 +521,25 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
 
       <div className="entry-form__actions">
         <button type="submit" className="button button--primary">
-          Save entry
+          {editingEntry ? 'Update entry' : 'Save entry'}
         </button>
-        <button
-          type="button"
-          className="button button--ghost"
-          onClick={() => {
-            setForm(clearMeasurements);
-            setErrors({});
-            setSaved(false);
-          }}
-        >
-          Reset
-        </button>
+        {editingEntry ? (
+          <button type="button" className="button button--ghost" onClick={onCancelEdit}>
+            Cancel
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={() => {
+              setForm(clearMeasurements);
+              setErrors({});
+              setSaved(false);
+            }}
+          >
+            Reset
+          </button>
+        )}
         <span role="status" className="entry-form__status">
           {saved ? savedMessage : ''}
         </span>

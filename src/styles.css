@@ -932,6 +932,17 @@ input:focus-visible {
   color: var(--text-faint);
 }
 
+.history__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history .button {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+
 .history__note {
   color: var(--text-muted);
   max-width: 220px;

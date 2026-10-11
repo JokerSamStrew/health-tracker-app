@@ -49,8 +49,19 @@ function generateDemoData(days: number, endDate: string): DailyEntry[] {
 
 export default function App() {
   const [windowDays, setWindowDays] = useState<number>(DEFAULT_WINDOW_DAYS);
-  const { entries, profile, report, upsertEntry, removeEntry, updateProfile, importData, clearAll, recovered } =
-    useHealthData({ windowDays });
+  const [editingEntry, setEditingEntry] = useState<DailyEntry | null>(null);
+  const {
+    entries,
+    profile,
+    report,
+    upsertEntry,
+    replaceEntry,
+    removeEntry,
+    updateProfile,
+    importData,
+    clearAll,
+    recovered,
+  } = useHealthData({ windowDays });
 
   const today = report.referenceDate;
   const chartData = useMemo(
@@ -162,8 +173,29 @@ export default function App() {
 
         <div className="app__columns">
           <div className="app__column">
-            <EntryForm defaultDate={today} onSave={upsertEntry} />
-            <HistoryTable entries={entries} onDelete={removeEntry} />
+            {/* Remount when the edit target changes so the form reloads cleanly. */}
+            <EntryForm
+              key={editingEntry ? editingEntry.date : 'new'}
+              defaultDate={today}
+              editingEntry={editingEntry}
+              onSave={(entry) => {
+                if (editingEntry) {
+                  replaceEntry(entry, editingEntry.date);
+                  setEditingEntry(null);
+                } else {
+                  upsertEntry(entry);
+                }
+              }}
+              onCancelEdit={() => setEditingEntry(null)}
+            />
+            <HistoryTable
+              entries={entries}
+              onEdit={setEditingEntry}
+              onDelete={(date) => {
+                if (editingEntry?.date === date) setEditingEntry(null);
+                removeEntry(date);
+              }}
+            />
           </div>
           <div className="app__column">
             <ProfilePanel
