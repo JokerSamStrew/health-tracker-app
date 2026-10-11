@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { formatLongDate, formatShortDate } from '../lib/date.ts';
 import { formatMetric } from '../lib/stats.ts';
+import { METRIC_FIELD } from '../lib/series.ts';
 import type { DailyEntry, MetricKey } from '../types.ts';
 import { METRIC_KEYS, METRIC_UNITS } from '../types.ts';
 
@@ -19,7 +20,7 @@ const EMPTY_MESSAGE: Record<MetricKey, string> = {
 };
 
 function cell(entry: DailyEntry, key: MetricKey): string {
-  const field = key === 'weight' ? 'weightKg' : key;
+  const field = METRIC_FIELD[key];
   const value = (entry as unknown as Record<string, unknown>)[field];
   if (typeof value !== 'number' || !Number.isFinite(value)) return EMPTY_MESSAGE[key];
   return formatMetric(value, DIGITS[key]);

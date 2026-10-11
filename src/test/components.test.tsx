@@ -37,7 +37,7 @@ function makeEntries(days: number, endDate = REFERENCE): DailyEntry[] {
       date: iso,
       weightKg: 80 + (days - 1 - i) * 0.2,
       steps: 9000,
-      sleepHours: 6,
+      sleepQuality: 3,
       calories: 2600,
     });
   }
@@ -52,7 +52,7 @@ describe('EntryForm', () => {
 
     await user.type(screen.getByLabelText(/weight/i), '81.4');
     await user.type(screen.getByLabelText(/^steps/i), '10500');
-    await user.type(screen.getByLabelText(/sleep/i), '7.5');
+    await user.selectOptions(screen.getByLabelText(/sleep/i), '4');
     await user.type(screen.getByLabelText(/calories eaten/i), '2400');
     await user.click(screen.getByRole('button', { name: /save entry/i }));
 
@@ -60,7 +60,7 @@ describe('EntryForm', () => {
       date: REFERENCE,
       weightKg: 81.4,
       steps: 10500,
-      sleepHours: 7.5,
+      sleepQuality: 4,
       calories: 2400,
     });
   });
@@ -142,7 +142,7 @@ describe('EntryForm', () => {
     fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-03-11' } });
     fireEvent.change(screen.getByLabelText('End'), { target: { value: '2024-03-17' } });
     await user.type(screen.getByLabelText(/^steps/i), '7000');
-    await user.type(screen.getByLabelText(/sleep/i), '7.5');
+    await user.selectOptions(screen.getByLabelText(/sleep/i), '4.5');
     await user.click(screen.getByRole('button', { name: /save entry/i }));
 
     expect(onSave).toHaveBeenCalledTimes(7);
@@ -156,7 +156,7 @@ describe('EntryForm', () => {
       '2024-03-16',
       '2024-03-17',
     ]);
-    expect(onSave.mock.calls[0]![0]).toEqual({ date: '2024-03-11', steps: 7000, sleepHours: 7.5 });
+    expect(onSave.mock.calls[0]![0]).toEqual({ date: '2024-03-11', steps: 7000, sleepQuality: 4.5 });
     expect(await screen.findByText(/saved\. applied to 7 days in that range/i)).toBeInTheDocument();
   });
 
@@ -244,7 +244,7 @@ describe('formToEntry', () => {
     end: REFERENCE,
     weightKg: '',
     steps: '',
-    sleepHours: '',
+    sleepQuality: '',
     calories: '',
     note: '',
   };
@@ -256,7 +256,7 @@ describe('formToEntry', () => {
 
   it('keeps fractional metrics as entered', () => {
     expect(formToEntry({ ...base, weightKg: '80.55' }).weightKg).toBe(80.55);
-    expect(formToEntry({ ...base, sleepHours: '7.25' }).sleepHours).toBe(7.25);
+    expect(formToEntry({ ...base, sleepQuality: '4.5' }).sleepQuality).toBe(4.5);
   });
 
   it('accepts a comma decimal separator', () => {
@@ -277,7 +277,7 @@ describe('formToEntries', () => {
     end: REFERENCE,
     weightKg: '',
     steps: '',
-    sleepHours: '',
+    sleepQuality: '',
     calories: '',
     note: '',
   };

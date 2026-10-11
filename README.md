@@ -3,7 +3,7 @@
 A local-first web app for logging daily health metrics and turning that log into
 detected problems plus concrete recommendations.
 
-Four metrics are tracked per day — **weight**, **steps**, **sleep hours** and
+Four metrics are tracked per day — **weight**, **steps**, **sleep quality** and
 **calories eaten** — and optional profile data (age, sex, height, activity level,
 goals) unlocks the energy-balance and goal-tracking analysis.
 
@@ -22,7 +22,7 @@ goals) unlocks the energy-balance and goal-tracking analysis.
 - **Insight engine** — 14 rules across data quality, body composition, weight,
   recovery, activity and energy. Each insight shows the numbers it used
   (`evidence`) and what to do about it (`recommendations`).
-- **Cross-metric analysis** — e.g. short sleep alongside a rising weight, or
+- **Cross-metric analysis** — e.g. poor sleep alongside a rising weight, or
   logged calories that do not explain the weight change you are seeing.
 - **Health score** — 0–100, derived from the severity of the findings.
 - **JSON backup** — export everything (entries + profile) to a `.json` file and
@@ -103,7 +103,7 @@ testable.
   a claim can be checked rather than trusted.
 
 The rules cover: insufficient data, logging coverage, missing metrics, BMI,
-weight trend and pace, distance to target weight, sleep duration and
+weight trend and pace, distance to target weight, sleep quality and
 consistency, sleep-vs-weight interaction, step volume and trend, calorie
 balance, calorie stability, and intake-vs-weight agreement.
 
@@ -127,7 +127,7 @@ balance, calorie stability, and intake-vs-weight agreement.
 pnpm test
 ```
 
-361 tests across 10 files, mirroring the `lib/` modules one-to-one, plus component
+360 tests across 10 files, mirroring the `lib/` modules one-to-one, plus component
 and hook tests. Notable techniques:
 
 - Determinism: tests always pass an explicit `referenceDate`, so no assertion

@@ -67,13 +67,13 @@ export const THRESHOLDS = {
   weightRapidLossBodyPercentPerWeek: 1,
   /** Distance to target that counts as "there". */
   weightGoalToleranceKg: 0.5,
-  /** Sleep shorter than `goal - this` is a deficit. */
-  sleepDeficitHours: 0.5,
-  /** Average sleep below this many hours is severe restriction. */
-  sleepSevereHours: 6,
-  /** Sleeping more than `goal + this` is flagged as excessive. */
-  sleepExcessHours: 1.5,
-  /** Sleep coefficient of variation above this percent is "irregular". */
+  /** Sleep quality below `goal - this` is flagged as below target. */
+  sleepDeficitQuality: 0.5,
+  /** Average sleep quality at or below this is very poor. */
+  sleepVeryPoorQuality: 2,
+  /** Average sleep quality below this can compound a weight trend. */
+  sleepPoorQuality: 3,
+  /** Sleep quality coefficient of variation above this percent is "irregular". */
   sleepIrregularCvPercent: 20,
   /** Step goal ratios. */
   stepsVeryLowRatio: 0.5,
@@ -126,7 +126,7 @@ const BMI_SEVERITY: Record<Exclude<BmiCategory, 'healthy'>, Severity> = {
 };
 
 function sleepGoal(profile: Profile): number {
-  return profile.sleepGoalHours ?? 8;
+  return profile.sleepGoalQuality ?? 4;
 }
 
 function stepGoal(profile: Profile): number {
@@ -572,7 +572,7 @@ function ruleWeightGoal(
   );
 }
 
-/** Average sleep against the personal goal. */
+/** Average sleep quality against the personal goal. */
 function ruleSleepAverage(profile: Profile, summaries: Record<MetricKey, MetricSummary>): Insight | null {
   const { count, average } = summaries.sleep;
   if (count < MIN_DAYS_FOR_INSIGHTS || average === null) return null;
@@ -581,43 +581,43 @@ function ruleSleepAverage(profile: Profile, summaries: Record<MetricKey, MetricS
   const avg = round(average, 1);
   const deficit = round(goal - avg, 1);
   const evidence = [
-    `Average ${fmt('sleep', avg)} h per night`,
-    `Goal ${fmt('sleep', goal)} h`,
+    `Average ${fmt('sleep', avg)}/5`,
+    `Goal ${fmt('sleep', goal)}/5`,
     `Based on ${count} nights`,
   ];
 
-  if (avg < THRESHOLDS.sleepSevereHours) {
+  if (avg <= THRESHOLDS.sleepVeryPoorQuality) {
     return buildInsight(
       'sleep.average',
       'recovery',
       'critical',
-      'Sleep is severely restricted',
-      `You are averaging only ${fmt('sleep', avg)} hours, well under the ${fmt('sleep', goal)} hour target.`,
+      'Sleep quality is very poor',
+      `You are averaging only ${fmt('sleep', avg)}/5 for sleep quality - consistently poor rest.`,
       evidence,
       [
         {
-          title: 'Add 20-30 minutes this week',
-          detail: 'Small increments stick; trying to jump straight to the goal rarely works.',
-        },
-        {
-          title: 'Fix the wake time first',
+          title: 'Protect a fixed wake time',
           detail: 'A fixed wake time, even at the weekend, pulls bedtime forward on its own.',
         },
         {
           title: 'Cut caffeine 8 hours before bed',
           detail: 'Caffeine has a half-life of about 5 hours and delays sleep onset.',
         },
+        {
+          title: 'Make the room dark and cool',
+          detail: 'Bright light and warmth both fragment the night and delay sleep onset.',
+        },
       ],
     );
   }
 
-  if (deficit > THRESHOLDS.sleepDeficitHours) {
+  if (deficit > THRESHOLDS.sleepDeficitQuality) {
     return buildInsight(
       'sleep.average',
       'recovery',
       'warning',
-      'Not enough sleep',
-      `You are averaging ${fmt('sleep', avg)} hours, about ${fmt('sleep', deficit)} h below your target.`,
+      'Sleep quality below target',
+      `You are averaging ${fmt('sleep', avg)}/5, about ${fmt('sleep', deficit)} below your ${fmt('sleep', goal)}/5 target.`,
       evidence,
       [
         {
@@ -636,37 +636,16 @@ function ruleSleepAverage(profile: Profile, summaries: Record<MetricKey, MetricS
     );
   }
 
-  if (deficit < -THRESHOLDS.sleepExcessHours) {
-    return buildInsight(
-      'sleep.average',
-      'recovery',
-      'info',
-      'Sleeping well above target',
-      `You are averaging ${fmt('sleep', avg)} hours, more than the ${fmt('sleep', goal)} hour target.`,
-      [...evidence, `${count} of ${count} nights logged`],
-      [
-        {
-          title: 'Check that you are not oversleeping',
-          detail: 'Consistently long sleep can flag illness, poor sleep quality, or an off schedule.',
-        },
-        {
-          title: 'Keep a consistent schedule',
-          detail: 'If you feel rested, this is fine - just avoid drifting later each week.',
-        },
-      ],
-    );
-  }
-
   return buildInsight(
     'sleep.average',
     'recovery',
     'positive',
-    'Sleep duration is on target',
-    `You are averaging ${fmt('sleep', avg)} hours per night, right around your ${fmt('sleep', goal)} hour goal.`,
+    'Sleep quality is on target',
+    `You are averaging ${fmt('sleep', avg)}/5, right around your ${fmt('sleep', goal)}/5 goal.`,
     evidence,
     [
       {
-        title: 'Sleep is your cheapest performance gain',
+        title: 'Sleep quality is your cheapest performance gain',
         detail: 'It supports training quality, appetite regulation and mood more than most supplements do.',
       },
     ],
@@ -682,9 +661,9 @@ function ruleSleepRegularity(summaries: Record<MetricKey, MetricSummary>): Insig
   if (cv === null) return null;
 
   const evidence = [
-    `Nightly variation: ${fmt('sleep', stdDev)} h (standard deviation)`,
+    `Nightly variation: ${fmt('sleep', stdDev)}/5 (standard deviation)`,
     `Coefficient of variation ${round(cv, 0)}%`,
-    `Average ${fmt('sleep', average)} h across ${count} nights`,
+    `Average ${fmt('sleep', average)}/5 across ${count} nights`,
   ];
 
   if (cv <= THRESHOLDS.sleepIrregularCvPercent) {
@@ -692,13 +671,13 @@ function ruleSleepRegularity(summaries: Record<MetricKey, MetricSummary>): Insig
       'sleep.regularity',
       'recovery',
       'positive',
-      'Sleep timing is consistent',
-      `Your nightly sleep varies by only ${round(cv, 0)}%, which is the ideal pattern.`,
+      'Sleep quality is consistent',
+      `Your sleep quality varies by only ${round(cv, 0)}%, which is the ideal pattern.`,
       evidence,
       [
         {
-          title: 'Keep the schedule',
-          detail: 'Consistency matters as much as total hours for recovery quality.',
+          title: 'Keep the routine',
+          detail: 'Consistency matters as much as the rating itself for recovery quality.',
         },
       ],
     );
@@ -709,7 +688,7 @@ function ruleSleepRegularity(summaries: Record<MetricKey, MetricSummary>): Insig
     'recovery',
     'warning',
     'Irregular sleep pattern',
-    `Your sleep duration swings by ${round(cv, 0)}%, which usually means an unstable schedule.`,
+    `Your sleep quality swings by ${round(cv, 0)}%, which usually means an unstable schedule or routine.`,
     evidence,
     [
       {
@@ -728,7 +707,7 @@ function ruleSleepRegularity(summaries: Record<MetricKey, MetricSummary>): Insig
   );
 }
 
-/** Cross-metric: short sleep alongside a rising weight. */
+/** Cross-metric: poor sleep quality alongside a rising weight. */
 function ruleSleepWeightInteraction(
   summaries: Record<MetricKey, MetricSummary>,
 ): Insight | null {
@@ -739,17 +718,17 @@ function ruleSleepWeightInteraction(
   const trend = summaries.weight.trendPerWeek;
   if (sleepAvg === null || trend === null) return null;
 
-  if (sleepAvg >= THRESHOLDS.sleepSevereHours + 0.5) return null;
+  if (sleepAvg >= THRESHOLDS.sleepPoorQuality) return null;
   if (trend < THRESHOLDS.weightTrendSignificantKgPerWeek) return null;
 
   return buildInsight(
     'sleep.weight-interaction',
     'recovery',
     'warning',
-    'Short sleep is compounding your weight trend',
-    `Sleep under ${fmt('sleep', sleepAvg)} h alongside a ${fmt('weight', trend)} kg/week gain is a known appetite-metabolism pattern.`,
+    'Poor sleep is compounding your weight trend',
+    `Average sleep quality of ${fmt('sleep', sleepAvg)}/5 alongside a ${fmt('weight', trend)} kg/week gain is a known appetite-metabolism pattern.`,
     [
-      `Average sleep ${fmt('sleep', sleepAvg)} h`,
+      `Average sleep quality ${fmt('sleep', sleepAvg)}/5`,
       `Weight trend ${trend > 0 ? '+' : ''}${fmt('weight', trend)} kg per week`,
     ],
     [

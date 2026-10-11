@@ -4,7 +4,7 @@
  * All numeric measurements use these units:
  * - weight:  kilograms (kg)
  * - steps:   steps per day (count)
- * - sleep:   hours per night (h)
+ * - sleep:   subjective quality rating, 1-5 (/5)
  * - calories: kilocalories per day (kcal)
  */
 
@@ -15,7 +15,7 @@ export type MetricKey = (typeof METRIC_KEYS)[number];
 export const METRIC_UNITS: Record<MetricKey, string> = {
   weight: 'kg',
   steps: 'steps',
-  sleep: 'h',
+  sleep: '/5',
   calories: 'kcal',
 };
 
@@ -23,7 +23,7 @@ export const METRIC_UNITS: Record<MetricKey, string> = {
 export const METRIC_RANGES: Record<MetricKey, { min: number; max: number; step: number }> = {
   weight: { min: 20, max: 400, step: 0.1 },
   steps: { min: 0, max: 200_000, step: 1 },
-  sleep: { min: 0, max: 24, step: 0.1 },
+  sleep: { min: 1, max: 5, step: 0.5 },
   calories: { min: 0, max: 20_000, step: 1 },
 };
 
@@ -33,7 +33,8 @@ export interface DailyEntry {
   date: string;
   weightKg?: number;
   steps?: number;
-  sleepHours?: number;
+  /** Subjective sleep quality on a 1-5 scale, halves allowed. */
+  sleepQuality?: number;
   calories?: number;
   note?: string;
 }
@@ -53,8 +54,8 @@ export interface Profile {
   /** Daily calorie intake target. Falls back to the estimated TDEE when omitted. */
   dailyCalorieGoal?: number;
   dailyStepGoal?: number;
-  /** Nightly sleep target in hours. Defaults to 8. */
-  sleepGoalHours?: number;
+  /** Nightly sleep quality target on a 1-5 scale. Defaults to 4. */
+  sleepGoalQuality?: number;
 }
 
 export interface MetricSummary {
@@ -127,6 +128,6 @@ export interface HealthReport {
 
 export const DEFAULT_PROFILE: Profile = {
   dailyStepGoal: 8000,
-  sleepGoalHours: 8,
+  sleepGoalQuality: 4,
   activityLevel: 'moderate',
 };

@@ -46,7 +46,7 @@ describe('sanitizeEntry', () => {
 
   it('rejects out-of-range values', () => {
     expect(sanitizeEntry({ date: '2024-03-08', weightKg: 5 })).toEqual({ date: '2024-03-08' });
-    expect(sanitizeEntry({ date: '2024-03-08', sleepHours: 30 })).toEqual({
+    expect(sanitizeEntry({ date: '2024-03-08', sleepQuality: 30 })).toEqual({
       date: '2024-03-08',
     });
     expect(sanitizeEntry({ date: '2024-03-08', calories: -5 })).toEqual({ date: '2024-03-08' });
@@ -127,7 +127,7 @@ describe('sanitizeProfile', () => {
       targetWeightKg: 78,
       dailyCalorieGoal: 2400,
       dailyStepGoal: 10000,
-      sleepGoalHours: 7.5,
+      sleepGoalQuality: 4.5,
     });
     expect(profile).toEqual({
       name: 'Sam',
@@ -138,7 +138,7 @@ describe('sanitizeProfile', () => {
       targetWeightKg: 78,
       dailyCalorieGoal: 2400,
       dailyStepGoal: 10000,
-      sleepGoalHours: 7.5,
+      sleepGoalQuality: 4.5,
     });
   });
 
@@ -149,7 +149,7 @@ describe('sanitizeProfile', () => {
   it('drops out-of-range values', () => {
     expect(sanitizeProfile({ age: 5 })).toEqual({});
     expect(sanitizeProfile({ heightCm: 400 })).toEqual({});
-    expect(sanitizeProfile({ sleepGoalHours: 2 })).toEqual({});
+    expect(sanitizeProfile({ sleepGoalQuality: 6 })).toEqual({});
   });
 
   it('drops an invalid sex or activity level', () => {

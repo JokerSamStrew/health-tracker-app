@@ -11,9 +11,9 @@ import type { DailyEntry } from '../types.ts';
 const REFERENCE = '2024-03-08';
 
 const ENTRIES: DailyEntry[] = [
-  { date: '2024-03-01', weightKg: 80, steps: 9000, sleepHours: 7, calories: 2400 },
-  { date: '2024-03-03', weightKg: 79.5, steps: 11000, sleepHours: 7.5, calories: 2500 },
-  { date: '2024-03-08', weightKg: 79, steps: 8000, sleepHours: 8, calories: 2300 },
+  { date: '2024-03-01', weightKg: 80, steps: 9000, sleepQuality: 3, calories: 2400 },
+  { date: '2024-03-03', weightKg: 79.5, steps: 11000, sleepQuality: 4, calories: 2500 },
+  { date: '2024-03-08', weightKg: 79, steps: 8000, sleepQuality: 4.5, calories: 2300 },
 ];
 
 describe('buildChartData', () => {
@@ -96,7 +96,7 @@ describe('CHART_KEYS', () => {
   it('maps every metric to a raw and rolling-average key', () => {
     expect(CHART_KEYS.weight).toEqual({ value: 'weightKg', average: 'weightAvg7' });
     expect(CHART_KEYS.steps).toEqual({ value: 'steps', average: 'stepsAvg7' });
-    expect(CHART_KEYS.sleep).toEqual({ value: 'sleepHours', average: 'sleepAvg7' });
+    expect(CHART_KEYS.sleep).toEqual({ value: 'sleepQuality', average: 'sleepAvg7' });
     expect(CHART_KEYS.calories).toEqual({ value: 'calories', average: 'caloriesAvg7' });
   });
 });

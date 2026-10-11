@@ -27,7 +27,7 @@ type FormState = {
   targetWeightKg: string;
   dailyCalorieGoal: string;
   dailyStepGoal: string;
-  sleepGoalHours: string;
+  sleepGoalQuality: string;
 };
 
 function toFormState(profile: Profile): FormState {
@@ -40,7 +40,7 @@ function toFormState(profile: Profile): FormState {
     targetWeightKg: profile.targetWeightKg !== undefined ? String(profile.targetWeightKg) : '',
     dailyCalorieGoal: profile.dailyCalorieGoal !== undefined ? String(profile.dailyCalorieGoal) : '',
     dailyStepGoal: profile.dailyStepGoal !== undefined ? String(profile.dailyStepGoal) : '',
-    sleepGoalHours: profile.sleepGoalHours !== undefined ? String(profile.sleepGoalHours) : '',
+    sleepGoalQuality: profile.sleepGoalQuality !== undefined ? String(profile.sleepGoalQuality) : '',
   };
 }
 
@@ -79,8 +79,8 @@ export function ProfilePanel({
     ...(optionalNumber(form.dailyStepGoal) !== undefined
       ? { dailyStepGoal: optionalNumber(form.dailyStepGoal) }
       : {}),
-    ...(optionalNumber(form.sleepGoalHours) !== undefined
-      ? { sleepGoalHours: optionalNumber(form.sleepGoalHours) }
+    ...(optionalNumber(form.sleepGoalQuality) !== undefined
+      ? { sleepGoalQuality: optionalNumber(form.sleepGoalQuality) }
       : {}),
   };
 
@@ -224,16 +224,16 @@ export function ProfilePanel({
           </label>
 
           <label className="field">
-            <span>Sleep goal (h)</span>
+            <span>Sleep goal (/5)</span>
             <input
               type="number"
               inputMode="decimal"
-              min={4}
-              max={14}
-              step={0.1}
-              value={form.sleepGoalHours}
-              placeholder="8"
-              onChange={(event) => update('sleepGoalHours', event.target.value)}
+              min={1}
+              max={5}
+              step={0.5}
+              value={form.sleepGoalQuality}
+              placeholder="4"
+              onChange={(event) => update('sleepGoalQuality', event.target.value)}
               onBlur={commit}
             />
           </label>

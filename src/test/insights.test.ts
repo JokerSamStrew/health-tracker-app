@@ -39,7 +39,7 @@ const BASE_PROFILE: Profile = {
   heightCm: 180,
   activityLevel: 'moderate',
   dailyStepGoal: 8000,
-  sleepGoalHours: 8,
+  sleepGoalQuality: 4,
 };
 
 describe('analyzeHealth - empty and minimal input', () => {
@@ -106,7 +106,7 @@ describe('analyzeHealth - empty and minimal input', () => {
     const entries = makeSeries(14, (i) => ({
       weightKg: 80 + i * 0.2,
       steps: 3000,
-      sleepHours: 5,
+      sleepQuality: 2,
       calories: 3000,
     }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
@@ -119,7 +119,7 @@ describe('analyzeHealth - empty and minimal input', () => {
     const entries = makeSeries(14, (i) => ({
       weightKg: 80 + i * 0.2,
       steps: 9000,
-      sleepHours: 7.5,
+      sleepQuality: 4.5,
       calories: 2400,
     }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
@@ -131,7 +131,7 @@ describe('analyzeHealth - empty and minimal input', () => {
     const entries = makeSeries(14, (i) => ({
       weightKg: 80 + i * 0.2,
       steps: 3000,
-      sleepHours: 5,
+      sleepQuality: 2,
       calories: 3000,
     }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
@@ -169,7 +169,7 @@ describe('score', () => {
     const entries = makeSeries(14, () => ({
       weightKg: 80,
       steps: 10000,
-      sleepHours: 8,
+      sleepQuality: 4,
       calories: 2650,
     }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
@@ -182,7 +182,7 @@ describe('score', () => {
     const entries = makeSeries(14, () => ({
       weightKg: 95,
       steps: 2000,
-      sleepHours: 5,
+      sleepQuality: 2,
       calories: 500,
     }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
@@ -195,7 +195,7 @@ describe('score', () => {
     const entries = makeSeries(14, () => ({
       weightKg: 80,
       steps: 10000,
-      sleepHours: 8,
+      sleepQuality: 4,
       calories: 2650,
     }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
@@ -306,58 +306,55 @@ describe('weight goal rule', () => {
 
 describe('sleep rules', () => {
   it('is positive when the goal is met', () => {
-    const entries = makeSeries(14, () => ({ sleepHours: 8 }));
+    const entries = makeSeries(14, () => ({ sleepQuality: 4 }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
     expect(insightById(report.insights, 'sleep.average').severity).toBe('positive');
   });
 
-  it('warns for a moderate deficit', () => {
-    const entries = makeSeries(14, () => ({ sleepHours: 6.5 }));
+  it('warns for quality with a moderate deficit', () => {
+    // The goal is 4/5, so an average of 3.4 sits 0.6 below the target.
+    const entries = makeSeries(14, () => ({ sleepQuality: 3.4 }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
     const insight = insightById(report.insights, 'sleep.average');
     expect(insight.severity).toBe('warning');
-    expect(insight.title).toBe('Not enough sleep');
+    expect(insight.title).toBe('Sleep quality below target');
   });
 
-  it('is critical below the severe threshold', () => {
-    const entries = makeSeries(14, () => ({ sleepHours: 5 }));
+  it('is critical at or below the very-poor threshold', () => {
+    const entries = makeSeries(14, () => ({ sleepQuality: 2 }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
     expect(insightById(report.insights, 'sleep.average').severity).toBe('critical');
   });
 
-  it('flags sleeping well above target', () => {
-    const entries = makeSeries(14, () => ({ sleepHours: 10.5 }));
-    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
-    expect(insightById(report.insights, 'sleep.average').title).toBe('Sleeping well above target');
-  });
-
   it('respects a custom sleep goal', () => {
-    const entries = makeSeries(14, () => ({ sleepHours: 7 }));
+    // An average of 3.5 meets a personal goal of 3.5 exactly.
+    const entries = makeSeries(14, () => ({ sleepQuality: 3.5 }));
     const report = analyzeHealth(
       entries,
-      { ...BASE_PROFILE, sleepGoalHours: 7 },
+      { ...BASE_PROFILE, sleepGoalQuality: 3.5 },
       { referenceDate: REFERENCE },
     );
     expect(insightById(report.insights, 'sleep.average').severity).toBe('positive');
   });
 
   it('warns about irregular sleep', () => {
-    // Alternating 4 and 11 hours: high coefficient of variation.
-    const entries = makeSeries(14, (i) => ({ sleepHours: i % 2 === 0 ? 4 : 11 }));
+    // Alternating 3 and 5: mean 4, standard deviation 1 -> 25% CV, above 20%.
+    const entries = makeSeries(14, (i) => ({ sleepQuality: i % 2 === 0 ? 3 : 5 }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
     expect(insightById(report.insights, 'sleep.regularity').title).toBe('Irregular sleep pattern');
   });
 
   it('is positive about consistent sleep', () => {
-    const entries = makeSeries(14, () => ({ sleepHours: 7.6 }));
+    const entries = makeSeries(14, () => ({ sleepQuality: 4 }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
     expect(insightById(report.insights, 'sleep.regularity').severity).toBe('positive');
   });
 
-  it('connects short sleep with a rising weight', () => {
+  it('connects poor sleep with a rising weight', () => {
+    // Average quality 2.5 sits below the poor-quality threshold of 3.
     const entries = makeSeries(14, (i) => ({
       weightKg: 78 + i * 0.15,
-      sleepHours: 5.8,
+      sleepQuality: 2.5,
     }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
     expect(insightById(report.insights, 'sleep.weight-interaction')).toBeDefined();
@@ -366,7 +363,7 @@ describe('sleep rules', () => {
   it('does not connect sleep and weight when sleep is fine', () => {
     const entries = makeSeries(14, (i) => ({
       weightKg: 78 + i * 0.15,
-      sleepHours: 8,
+      sleepQuality: 4,
     }));
     const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
     expect(report.insights.some((i) => i.id === 'sleep.weight-interaction')).toBe(false);
@@ -571,7 +568,7 @@ describe('determinism', () => {
     const entries = makeSeries(14, (i) => ({
       weightKg: 80 + i * 0.1,
       steps: 7000,
-      sleepHours: 7,
+      sleepQuality: 4,
       calories: 2400,
     }));
     const first = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
@@ -606,21 +603,21 @@ describe('helpers', () => {
   });
 
   it('correlationBetween needs a minimum of paired days', () => {
-    const few: DailyEntry[] = makeSeries(4, () => ({ weightKg: 80, sleepHours: 7 }));
+    const few: DailyEntry[] = makeSeries(4, () => ({ weightKg: 80, sleepQuality: 4 }));
     expect(correlationBetween(few, 'weight', 'sleep')).toBeNull();
   });
 
   it('correlationBetween finds a strong relationship', () => {
     const entries = makeSeries(14, (i) => ({
       weightKg: 80 + i,
-      sleepHours: 5 + i * 0.2,
+      sleepQuality: 2 + i * 0.2,
     }));
     const correlation = correlationBetween(entries, 'weight', 'sleep')!;
     expect(correlation).toBeGreaterThan(0.95);
   });
 
   it('exposes the thresholds it uses', () => {
-    expect(THRESHOLDS.sleepSevereHours).toBe(6);
+    expect(THRESHOLDS.sleepVeryPoorQuality).toBe(2);
     expect(THRESHOLDS.weightTrendSignificantKgPerWeek).toBeGreaterThan(0);
   });
 });

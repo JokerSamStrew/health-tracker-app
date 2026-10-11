@@ -193,7 +193,7 @@ describe('summarizeMetric', () => {
 
   it('exposes the unit', () => {
     expect(summarizeMetric(entries, 'weight').unit).toBe('kg');
-    expect(summarizeMetric(entries, 'sleep').unit).toBe('h');
+    expect(summarizeMetric(entries, 'sleep').unit).toBe('/5');
     expect(summarizeMetric(entries, 'calories').unit).toBe('kcal');
     expect(summarizeMetric(entries, 'steps').unit).toBe('steps');
   });

@@ -5,7 +5,7 @@ changing code.
 
 ## What this project is
 
-A local-first health tracker. Users log weight, steps, sleep hours and calories
+A local-first health tracker. Users log weight, steps, sleep quality and calories
 eaten per day; the app analyses the log and surfaces problems plus
 recommendations. React 19 + TypeScript + Vite + Recharts, built and tested with
 pnpm.
@@ -113,7 +113,7 @@ the components.
   `METRIC_RANGES`, `STORAGE_KEYS`).
 - **Nulls over sentinel values.** A metric that was never logged is `null`, not
   `0`. Guards read `if (x === null) return null;`.
-- **Units are fixed:** kg, steps, hours, kcal. Unit strings come from
+- **Units are fixed:** kg, steps, a `/5` rating, kcal. Unit strings come from
   `METRIC_UNITS` in `src/types.ts`; do not hardcode `'kg'` in new components.
 - **Numbers shown to users** go through `formatMetric` / `formatNumber` /
   `fmt()` so rounding and thousands separators stay uniform.
@@ -130,14 +130,14 @@ failures.
 | TDEE at moderate activity | BMR x 1.55 = **2759** kcal for the male profile above |
 | `KCAL_PER_KG` | 7700 |
 | `SAFE_PACE_KG_PER_WEEK` | 0.45 kg/wk = 495 kcal/day |
-| Default step goal / sleep goal | 8000 steps / 8 h |
+| Default step goal / sleep quality goal | 8000 steps / 4 (out of 5) |
 | `MIN_DAYS_FOR_INSIGHTS` / `MIN_DAYS_FOR_TREND` | 3 / 5 |
 | Health score | `100 - 18*critical - 9*warning`, clamped 0–100, `null` below the minimum |
 
 Activity multipliers: sedentary 1.2, light 1.375, moderate 1.55, active 1.725,
 athlete 1.9.
 
-`METRIC_RANGES`: weight 20–400 (step 0.1), steps 0–200000, sleep 0–24,
+`METRIC_RANGES`: weight 20–400 (step 0.1), steps 0–200000, sleep 1–5 (step 0.5),
 calories 0–20000.
 
 ## Testing notes
@@ -165,7 +165,8 @@ calories 0–20000.
 - No accounts, sync, export or multi-device support.
 - BMR/TDEE are population-level estimates; they ignore lean mass, thyroid
   function and everything else a clinician would look at.
-- Sleep is a single self-reported number per night, not sleep stages.
+- Sleep is a single self-reported quality rating (1–5) per night, not sleep
+  stages or a polysomnogram.
 - The sample-data generator is a deterministic pseudo-random walk, so its output
   is stable but is not real physiological data.
 - The production bundle is ~640 kB (194 kB gzipped), dominated by Recharts.

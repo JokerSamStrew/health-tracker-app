@@ -30,22 +30,35 @@ interface FormState {
   end: string;
   weightKg: string;
   steps: string;
-  sleepHours: string;
+  sleepQuality: string;
   calories: string;
   note: string;
 }
 
-type FieldName = 'weightKg' | 'steps' | 'sleepHours' | 'calories';
+type FieldName = 'weightKg' | 'steps' | 'sleepQuality' | 'calories';
 
-const METRIC_FIELDS: FieldName[] = ['weightKg', 'steps', 'sleepHours', 'calories'];
+const METRIC_FIELDS: FieldName[] = ['weightKg', 'steps', 'sleepQuality', 'calories'];
 
 /** Form field -> metric key, needed because `weightKg` maps to `weight`. */
 const METRIC_FOR_FIELD: Record<FieldName, MetricKey> = {
   weightKg: 'weight',
   steps: 'steps',
-  sleepHours: 'sleep',
+  sleepQuality: 'sleep',
   calories: 'calories',
 };
+
+/** Selectable sleep-quality ratings, 1-5 with half-steps. */
+export const SLEEP_QUALITY_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '1', label: '1 - Poor' },
+  { value: '1.5', label: '1.5 - Poor to Fair' },
+  { value: '2', label: '2 - Fair' },
+  { value: '2.5', label: '2.5 - Fair to Good' },
+  { value: '3', label: '3 - Good' },
+  { value: '3.5', label: '3.5 - Good to Great' },
+  { value: '4', label: '4 - Great' },
+  { value: '4.5', label: '4.5 - Great to Excellent' },
+  { value: '5', label: '5 - Excellent' },
+];
 
 function emptyForm(today: string): FormState {
   return {
@@ -55,7 +68,7 @@ function emptyForm(today: string): FormState {
     end: today,
     weightKg: '',
     steps: '',
-    sleepHours: '',
+    sleepQuality: '',
     calories: '',
     note: '',
   };
@@ -70,7 +83,7 @@ function clearMeasurements(current: FormState): FormState {
     end: current.end,
     weightKg: '',
     steps: '',
-    sleepHours: '',
+    sleepQuality: '',
     calories: '',
     note: '',
   };
@@ -133,8 +146,8 @@ export function formToEntry(form: FormState): DailyEntry {
   const steps = parseNumber(form.steps);
   if (steps !== null) entry.steps = Math.round(steps);
 
-  const sleep = parseNumber(form.sleepHours);
-  if (sleep !== null) entry.sleepHours = sleep;
+  const sleep = parseNumber(form.sleepQuality);
+  if (sleep !== null) entry.sleepQuality = sleep;
 
   const calories = parseNumber(form.calories);
   if (calories !== null) entry.calories = Math.round(calories);
@@ -334,22 +347,23 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
 
       <div className="entry-form__row">
         <label className="field">
-          <span>Sleep (h)</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step={METRIC_RANGES.sleep.step}
-            min={METRIC_RANGES.sleep.min}
-            max={METRIC_RANGES.sleep.max}
-            placeholder="7.5"
-            value={form.sleepHours}
-            onChange={(event) => update('sleepHours', event.target.value)}
-            aria-invalid={errors.sleepHours ? 'true' : undefined}
-            aria-describedby={errors.sleepHours ? 'entry-sleep-error' : undefined}
-          />
-          {errors.sleepHours ? (
+          <span>Sleep quality</span>
+          <select
+            value={form.sleepQuality}
+            onChange={(event) => update('sleepQuality', event.target.value)}
+            aria-invalid={errors.sleepQuality ? 'true' : undefined}
+            aria-describedby={errors.sleepQuality ? 'entry-sleep-error' : undefined}
+          >
+            <option value="">Not set</option>
+            {SLEEP_QUALITY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {errors.sleepQuality ? (
             <small className="field__error" id="entry-sleep-error">
-              {errors.sleepHours}
+              {errors.sleepQuality}
             </small>
           ) : null}
         </label>

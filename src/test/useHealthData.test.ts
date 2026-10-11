@@ -173,7 +173,7 @@ describe('useHealthData', () => {
         const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
           date.getDate(),
         ).padStart(2, '0')}`;
-        result.current.upsertEntry({ date: iso, weightKg: 80, sleepHours: 5, steps: 3000 });
+        result.current.upsertEntry({ date: iso, weightKg: 80, sleepQuality: 3, steps: 3000 });
       }
     });
 

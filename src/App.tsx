@@ -32,13 +32,14 @@ function generateDemoData(days: number, endDate: string): DailyEntry[] {
     ).padStart(2, '0')}`;
 
     const skip = rand() < 0.08;
-    const sleep = Math.round((6.2 + rand() * 2.6) * 10) / 10;
+    // Quality rating 2-5 (each integer gets a roughly equal share).
+    const sleepQuality = 2 + Math.floor(rand() * 4);
     weight += (rand() - 0.55) * 0.18;
     entries.push({
       date: iso,
       weightKg: Math.round(weight * 10) / 10,
       steps: Math.round(4200 + rand() * 8000),
-      sleepHours: sleep,
+      sleepQuality,
       calories: Math.round(1700 + rand() * 900),
       note: skip ? 'Rest day' : undefined,
     });
@@ -143,7 +144,7 @@ export default function App() {
               metric="sleep"
               data={chartData}
               summary={report.summaries.sleep}
-              goal={profile.sleepGoalHours}
+              goal={profile.sleepGoalQuality}
               goalLabel="Sleep goal"
             />
             <TimeSeriesChart

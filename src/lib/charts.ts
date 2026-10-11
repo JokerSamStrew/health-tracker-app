@@ -17,7 +17,7 @@ export interface ChartPoint {
   label: string;
   weightKg: number | null;
   steps: number | null;
-  sleepHours: number | null;
+  sleepQuality: number | null;
   calories: number | null;
   /** 7-day rolling averages, used as trend lines on the charts. */
   weightAvg7: number | null;
@@ -47,7 +47,7 @@ export function buildChartData(
       day,
       weightKg: entry?.weightKg ?? null,
       steps: entry?.steps ?? null,
-      sleepHours: entry?.sleepHours ?? null,
+      sleepQuality: entry?.sleepQuality ?? null,
       calories: entry?.calories ?? null,
       weightAvg7: null,
       stepsAvg7: null,
@@ -65,7 +65,7 @@ export function buildChartData(
     ROLLING_WINDOW,
   );
   const sleep = rollingAverage(
-    raw.map((point) => point.sleepHours),
+    raw.map((point) => point.sleepQuality),
     ROLLING_WINDOW,
   );
   const calories = rollingAverage(
@@ -86,7 +86,7 @@ export function buildChartData(
 export const CHART_KEYS: Record<MetricKey, { value: keyof ChartPoint; average: keyof ChartPoint }> = {
   weight: { value: 'weightKg', average: 'weightAvg7' },
   steps: { value: 'steps', average: 'stepsAvg7' },
-  sleep: { value: 'sleepHours', average: 'sleepAvg7' },
+  sleep: { value: 'sleepQuality', average: 'sleepAvg7' },
   calories: { value: 'calories', average: 'caloriesAvg7' },
 };
 
