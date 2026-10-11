@@ -775,6 +775,11 @@ input:focus-visible {
   padding-top: 4px;
 }
 
+.entry-form__hint {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
 .entry-form__status {
   font-size: 0.8125rem;
   color: var(--positive);

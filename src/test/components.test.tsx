@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BackupPanel } from '../components/BackupPanel.tsx';
-import { EntryForm, formToEntry } from '../components/EntryForm.tsx';
+import { EntryForm, formToEntries, formToEntry } from '../components/EntryForm.tsx';
 import { HistoryTable } from '../components/HistoryTable.tsx';
 import { InsightsPanel } from '../components/InsightsPanel.tsx';
 import { SummaryCards } from '../components/SummaryCards.tsx';
@@ -132,11 +132,116 @@ describe('EntryForm', () => {
     expect(date).toHaveAttribute('max', REFERENCE);
     expect(date).toHaveAttribute('min', '2021-03-15');
   });
+
+  it('logs a custom date range from one set of values', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+
+    await user.selectOptions(screen.getByLabelText('Period'), 'range');
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-03-11' } });
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '2024-03-17' } });
+    await user.type(screen.getByLabelText(/^steps/i), '7000');
+    await user.type(screen.getByLabelText(/sleep/i), '7.5');
+    await user.click(screen.getByRole('button', { name: /save entry/i }));
+
+    expect(onSave).toHaveBeenCalledTimes(7);
+    const dates = onSave.mock.calls.map((call) => call[0].date as string);
+    expect(dates).toEqual([
+      '2024-03-11',
+      '2024-03-12',
+      '2024-03-13',
+      '2024-03-14',
+      '2024-03-15',
+      '2024-03-16',
+      '2024-03-17',
+    ]);
+    expect(onSave.mock.calls[0]![0]).toEqual({ date: '2024-03-11', steps: 7000, sleepHours: 7.5 });
+    expect(await screen.findByText(/saved\. applied to 7 days in that range/i)).toBeInTheDocument();
+  });
+
+  it('logs a range that crosses a month boundary', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+
+    await user.selectOptions(screen.getByLabelText('Period'), 'range');
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-03-30' } });
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '2024-04-02' } });
+    await user.type(screen.getByLabelText(/^steps/i), '8000');
+    await user.click(screen.getByRole('button', { name: /save entry/i }));
+
+    expect(onSave).toHaveBeenCalledTimes(4);
+    expect(onSave.mock.calls[0]![0].date).toBe('2024-03-30');
+    expect(onSave.mock.calls.at(-1)![0].date).toBe('2024-04-02');
+  });
+
+  it('validates bulk entries exactly like a single day', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+
+    await user.selectOptions(screen.getByLabelText('Period'), 'range');
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-03-11' } });
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '2024-03-17' } });
+    // METRIC_RANGES.steps.max is 200,000, so 250,000 is out of range.
+    await user.type(screen.getByLabelText(/^steps/i), '250000');
+    await user.click(screen.getByRole('button', { name: /save entry/i }));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(await screen.findByText(/must be between/i)).toBeInTheDocument();
+  });
+
+  it('rejects a range whose end precedes its start', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+
+    await user.selectOptions(screen.getByLabelText('Period'), 'range');
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-03-17' } });
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '2024-03-11' } });
+    await user.type(screen.getByLabelText(/^steps/i), '7000');
+    await user.click(screen.getByRole('button', { name: /save entry/i }));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(await screen.findByText(/end date must be on or after the start date/i)).toBeInTheDocument();
+  });
+
+  it('rejects a range longer than 366 days', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+
+    await user.selectOptions(screen.getByLabelText('Period'), 'range');
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-01-01' } });
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '2025-01-01' } });
+    await user.type(screen.getByLabelText(/^steps/i), '7000');
+    await user.click(screen.getByRole('button', { name: /save entry/i }));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(await screen.findByText(/maximum 366 days per range/i)).toBeInTheDocument();
+  });
+
+  it('keeps the range pickers when resetting', async () => {
+    const user = userEvent.setup();
+    render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
+
+    await user.selectOptions(screen.getByLabelText('Period'), 'range');
+    const steps = screen.getByLabelText(/^steps/i);
+    await user.type(steps, '9000');
+    await user.click(screen.getByRole('button', { name: /reset/i }));
+
+    expect(screen.getByLabelText('Start')).toBeInTheDocument();
+    expect(steps).toHaveValue(null);
+  });
 });
 
 describe('formToEntry', () => {
   const base = {
+    period: 'day' as const,
     date: REFERENCE,
+    start: REFERENCE,
+    end: REFERENCE,
     weightKg: '',
     steps: '',
     sleepHours: '',
@@ -161,6 +266,67 @@ describe('formToEntry', () => {
   it('trims the note and drops it when empty', () => {
     expect(formToEntry({ ...base, note: '  run  ' }).note).toBe('run');
     expect(formToEntry({ ...base, note: '   ' })).not.toHaveProperty('note');
+  });
+});
+
+describe('formToEntries', () => {
+  const base = {
+    period: 'day' as const,
+    date: REFERENCE,
+    start: REFERENCE,
+    end: REFERENCE,
+    weightKg: '',
+    steps: '',
+    sleepHours: '',
+    calories: '',
+    note: '',
+  };
+
+  it('returns one entry for a day', () => {
+    expect(formToEntries({ ...base, steps: '9000' })).toEqual([
+      { date: REFERENCE, steps: 9000 },
+    ]);
+  });
+
+  it('expands a range into one entry per day, both ends included', () => {
+    const entries = formToEntries({
+      ...base,
+      period: 'range',
+      start: '2024-03-11',
+      end: '2024-03-17',
+      steps: '7000',
+      note: 'easy week',
+    });
+
+    expect(entries).toHaveLength(7);
+    expect(entries[0]).toEqual({ date: '2024-03-11', steps: 7000, note: 'easy week' });
+    expect(entries[6]).toEqual({ date: '2024-03-17', steps: 7000, note: 'easy week' });
+    // The values are per-day figures applied to every generated day.
+    expect(new Set(entries.map((entry) => entry.steps))).toEqual(new Set([7000]));
+  });
+
+  it('expands a range across a month boundary', () => {
+    const entries = formToEntries({
+      ...base,
+      period: 'range',
+      start: '2024-03-30',
+      end: '2024-04-02',
+      weightKg: '80',
+    });
+
+    expect(entries).toHaveLength(4);
+    expect(entries[0]).toEqual({ date: '2024-03-30', weightKg: 80 });
+    expect(entries.at(-1)).toEqual({ date: '2024-04-02', weightKg: 80 });
+  });
+
+  it('handles a single-day range', () => {
+    const entries = formToEntries({ ...base, period: 'range', start: '2024-03-14', end: '2024-03-14' });
+    expect(entries).toEqual([{ date: '2024-03-14' }]);
+  });
+
+  it('returns no entries for an invalid or backwards range', () => {
+    expect(formToEntries({ ...base, period: 'range', start: 'nope', end: '2024-03-17' })).toEqual([]);
+    expect(formToEntries({ ...base, period: 'range', start: '2024-03-17', end: '2024-03-11' })).toEqual([]);
   });
 });
 

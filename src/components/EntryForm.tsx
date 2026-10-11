@@ -1,5 +1,11 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { addDays, fromISODate, toISODate } from '../lib/date.ts';
+import {
+  addDays,
+  dateRange,
+  daysBetween,
+  fromISODate,
+  toISODate,
+} from '../lib/date.ts';
 import { METRIC_RANGES } from '../types.ts';
 import type { DailyEntry, MetricKey } from '../types.ts';
 
@@ -9,8 +15,19 @@ export interface EntryFormProps {
   onSave: (entry: DailyEntry) => void;
 }
 
+export type EntryPeriod = 'day' | 'range';
+
+/** Safety cap so one save cannot grow past a year of entries. */
+const MAX_RANGE_DAYS = 366;
+
 interface FormState {
+  period: EntryPeriod;
+  /** `YYYY-MM-DD`, used when `period` is 'day'. */
   date: string;
+  /** `YYYY-MM-DD`, used when `period` is 'range'. */
+  start: string;
+  /** `YYYY-MM-DD`, used when `period` is 'range'. */
+  end: string;
   weightKg: string;
   steps: string;
   sleepHours: string;
@@ -30,8 +47,33 @@ const METRIC_FOR_FIELD: Record<FieldName, MetricKey> = {
   calories: 'calories',
 };
 
-function emptyForm(date: string): FormState {
-  return { date, weightKg: '', steps: '', sleepHours: '', calories: '', note: '' };
+function emptyForm(today: string): FormState {
+  return {
+    period: 'day',
+    date: today,
+    start: today,
+    end: today,
+    weightKg: '',
+    steps: '',
+    sleepHours: '',
+    calories: '',
+    note: '',
+  };
+}
+
+/** Keeps the chosen period and its pickers, clears the measurement values. */
+function clearMeasurements(current: FormState): FormState {
+  return {
+    period: current.period,
+    date: current.date,
+    start: current.start,
+    end: current.end,
+    weightKg: '',
+    steps: '',
+    sleepHours: '',
+    calories: '',
+    note: '',
+  };
 }
 
 function parseNumber(raw: string): number | null {
@@ -46,8 +88,17 @@ function parseNumber(raw: string): number | null {
 function validate(form: FormState): Partial<Record<keyof FormState, string>> {
   const errors: Partial<Record<keyof FormState, string>> = {};
 
-  if (!fromISODate(form.date)) {
-    errors.date = 'Pick a valid date.';
+  if (form.period === 'day') {
+    if (!fromISODate(form.date)) errors.date = 'Pick a valid date.';
+  } else {
+    if (!fromISODate(form.start)) errors.start = 'Pick a valid start date.';
+    if (!fromISODate(form.end)) errors.end = 'Pick a valid end date.';
+    const span = daysBetween(form.start, form.end);
+    if (span !== null && span < 0) {
+      errors.end = 'End date must be on or after the start date.';
+    } else if (span !== null && span + 1 > MAX_RANGE_DAYS) {
+      errors.end = `Maximum ${MAX_RANGE_DAYS} days per range.`;
+    }
   }
 
   for (const field of METRIC_FIELDS) {
@@ -94,23 +145,37 @@ export function formToEntry(form: FormState): DailyEntry {
   return entry;
 }
 
+/**
+ * The entries a save produces: one for the chosen day, or one per day in the
+ * chosen range. Values are applied to every generated day.
+ */
+export function formToEntries(form: FormState): DailyEntry[] {
+  const dates = form.period === 'range' ? dateRange(form.start, form.end) : [form.date];
+  return dates.map((date) => formToEntry({ ...form, date }));
+}
+
 export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
   const today = defaultDate ?? toISODate(new Date());
   const [form, setForm] = useState<FormState>(() => emptyForm(today));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [saved, setSaved] = useState(false);
 
-  // Keep the date field on today without clobbering typed measurements.
+  // Keep the pickers on today without clobbering typed measurements.
   const [lastToday, setLastToday] = useState(today);
   if (today !== lastToday) {
     setLastToday(today);
-    setForm((current) => ({ ...current, date: today }));
+    setForm((current) => ({
+      ...current,
+      date: today,
+      start: today,
+      end: today,
+    }));
   }
 
   const minDate = useMemo(() => addDays(today, -365 * 3), [today]);
   const maxDate = today;
 
-  function update(field: keyof FormState, value: string): void {
+  function update<K extends keyof FormState>(field: K, value: FormState[K]): void {
     setSaved(false);
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => {
@@ -130,12 +195,18 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
       return;
     }
 
-    onSave(formToEntry(form));
-    // Keep the date so several days can be entered in a row; clear the numbers.
-    setForm((current) => emptyForm(current.date));
+    // A range save writes several entries; React batches the state updates
+    // into a single render, so the app persists one merged state.
+    for (const entry of formToEntries(form)) onSave(entry);
+    setForm(clearMeasurements);
     setErrors({});
     setSaved(true);
   }
+
+  const savedMessage =
+    form.period === 'day'
+      ? 'Saved. Values merged into that day.'
+      : `Saved. Applied to ${formToEntries(form).length} days in that range.`;
 
   return (
     <form className="card entry-form" onSubmit={handleSubmit} noValidate>
@@ -143,23 +214,81 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
 
       <div className="entry-form__row">
         <label className="field">
-          <span>Date</span>
-          <input
-            type="date"
-            value={form.date}
-            min={minDate}
-            max={maxDate}
-            onChange={(event) => update('date', event.target.value)}
-            aria-invalid={errors.date ? 'true' : undefined}
-            aria-describedby={errors.date ? 'entry-date-error' : undefined}
-          />
-          {errors.date ? (
-            <small className="field__error" id="entry-date-error">
-              {errors.date}
-            </small>
-          ) : null}
+          <span>Period</span>
+          <select
+            value={form.period}
+            onChange={(event) => update('period', event.target.value as EntryPeriod)}
+          >
+            <option value="day">Exact date</option>
+            <option value="range">Custom range</option>
+          </select>
         </label>
 
+        {form.period === 'day' ? (
+          <label className="field">
+            <span>Date</span>
+            <input
+              type="date"
+              value={form.date}
+              min={minDate}
+              max={maxDate}
+              onChange={(event) => update('date', event.target.value)}
+              aria-invalid={errors.date ? 'true' : undefined}
+              aria-describedby={errors.date ? 'entry-date-error' : undefined}
+            />
+            {errors.date ? (
+              <small className="field__error" id="entry-date-error">
+                {errors.date}
+              </small>
+            ) : null}
+          </label>
+        ) : (
+          <>
+            <label className="field">
+              <span>Start</span>
+              <input
+                type="date"
+                value={form.start}
+                min={minDate}
+                max={maxDate}
+                onChange={(event) => update('start', event.target.value)}
+                aria-invalid={errors.start ? 'true' : undefined}
+                aria-describedby={errors.start ? 'entry-start-error' : undefined}
+              />
+              {errors.start ? (
+                <small className="field__error" id="entry-start-error">
+                  {errors.start}
+                </small>
+              ) : null}
+            </label>
+            <label className="field">
+              <span>End</span>
+              <input
+                type="date"
+                value={form.end}
+                min={minDate}
+                max={maxDate}
+                onChange={(event) => update('end', event.target.value)}
+                aria-invalid={errors.end ? 'true' : undefined}
+                aria-describedby={errors.end ? 'entry-end-error' : undefined}
+              />
+              {errors.end ? (
+                <small className="field__error" id="entry-end-error">
+                  {errors.end}
+                </small>
+              ) : null}
+            </label>
+          </>
+        )}
+      </div>
+
+      {form.period !== 'day' ? (
+        <p className="entry-form__hint">
+          One set of values is applied to every day from Start to End, both included.
+        </p>
+      ) : null}
+
+      <div className="entry-form__row">
         <label className="field">
           <span>Weight (kg)</span>
           <input
@@ -180,9 +309,7 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
             </small>
           ) : null}
         </label>
-      </div>
 
-      <div className="entry-form__row">
         <label className="field">
           <span>Steps</span>
           <input
@@ -203,7 +330,9 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
             </small>
           ) : null}
         </label>
+      </div>
 
+      <div className="entry-form__row">
         <label className="field">
           <span>Sleep (h)</span>
           <input
@@ -224,9 +353,7 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
             </small>
           ) : null}
         </label>
-      </div>
 
-      <div className="entry-form__row">
         <label className="field">
           <span>Calories eaten (kcal)</span>
           <input
@@ -247,7 +374,9 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
             </small>
           ) : null}
         </label>
+      </div>
 
+      <div className="entry-form__row">
         <label className="field">
           <span>Note (optional)</span>
           <input
@@ -275,7 +404,7 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
           type="button"
           className="button button--ghost"
           onClick={() => {
-            setForm(emptyForm(form.date));
+            setForm(clearMeasurements);
             setErrors({});
             setSaved(false);
           }}
@@ -283,7 +412,7 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
           Reset
         </button>
         <span role="status" className="entry-form__status">
-          {saved ? 'Saved. Values merged into that day.' : ''}
+          {saved ? savedMessage : ''}
         </span>
       </div>
     </form>

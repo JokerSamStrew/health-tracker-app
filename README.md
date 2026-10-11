@@ -14,6 +14,9 @@ goals) unlocks the energy-balance and goal-tracking analysis.
 
 - **Daily log** — one entry per day, every field optional, back-datable up to
   three years.
+- **Bulk entry** — switch the entry form to a custom date range and one set of
+  values is applied to every day between the two dates, or save a single exact
+  date as before.
 - **Four timelines** — Recharts line charts with a 7-day rolling average, the
   latest/average/trend stats, and a dashed goal line for any goal you set.
 - **Insight engine** — 14 rules across data quality, body composition, weight,
@@ -124,7 +127,7 @@ balance, calorie stability, and intake-vs-weight agreement.
 pnpm test
 ```
 
-350 tests across 10 files, mirroring the `lib/` modules one-to-one, plus component
+361 tests across 10 files, mirroring the `lib/` modules one-to-one, plus component
 and hook tests. Notable techniques:
 
 - Determinism: tests always pass an explicit `referenceDate`, so no assertion
