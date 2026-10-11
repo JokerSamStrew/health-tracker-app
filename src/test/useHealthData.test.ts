@@ -116,21 +116,21 @@ describe('useHealthData', () => {
   it('updates the profile without dropping other fields', () => {
     const { result } = setup();
     act(() => {
-      result.current.updateProfile({ heightCm: 180, age: 30 });
+      result.current.updateProfile({ heightCm: 180, birthDate: '1994-03-14' });
     });
     act(() => {
-      result.current.updateProfile({ age: 31 });
+      result.current.updateProfile({ birthDate: '1993-03-14' });
     });
 
     expect(result.current.profile.heightCm).toBe(180);
-    expect(result.current.profile.age).toBe(31);
+    expect(result.current.profile.birthDate).toBe('1993-03-14');
   });
 
   it('clears entries and persisted state on request', () => {
     const { result, storage } = setup();
     act(() => {
       result.current.upsertEntry({ date: REFERENCE, steps: 9000 });
-      result.current.updateProfile({ age: 30 });
+      result.current.updateProfile({ birthDate: '1994-03-14' });
     });
 
     act(() => {
@@ -142,7 +142,7 @@ describe('useHealthData', () => {
     // rather than that the key was removed.
     expect(storage.getItem(STORAGE_KEYS.entries)).not.toContain(REFERENCE);
     // The profile is kept on purpose so "delete all data" does not reset goals.
-    expect(result.current.profile.age).toBe(30);
+    expect(result.current.profile.birthDate).toBe('1994-03-14');
   });
 
   it('reloads persisted entries from storage', () => {
@@ -219,25 +219,25 @@ describe('useHealthData', () => {
 
     act(() => {
       result.current.importData([{ date: '2024-03-01', steps: 3000, weightKg: 79 }], {
-        age: 40,
+        birthDate: '1984-03-14',
         sex: 'female',
       });
     });
 
     // Nothing from before the import survives.
     expect(result.current.entries).toEqual([{ date: '2024-03-01', steps: 3000, weightKg: 79 }]);
-    expect(result.current.profile).toEqual({ ...DEFAULT_PROFILE, age: 40, sex: 'female' });
+    expect(result.current.profile).toEqual({ ...DEFAULT_PROFILE, birthDate: '1984-03-14', sex: 'female' });
     expect(result.current.profile.heightCm).toBeUndefined();
   });
 
   it('persists imported data to storage', () => {
     const { result, storage } = setup();
     act(() => {
-      result.current.importData([{ date: REFERENCE, steps: 7000 }], { age: 30 });
+      result.current.importData([{ date: REFERENCE, steps: 7000 }], { birthDate: '1994-03-14' });
     });
 
     expect(storage.getItem(STORAGE_KEYS.entries)).toContain(REFERENCE);
-    expect(storage.getItem(STORAGE_KEYS.profile)).toContain('30');
+    expect(storage.getItem(STORAGE_KEYS.profile)).toContain('1994-03-14');
   });
 
   it('clears the recovered flag after a successful import', () => {

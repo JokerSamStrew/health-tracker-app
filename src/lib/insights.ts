@@ -23,7 +23,7 @@ import {
   dailyCalorieDeltaForWeightChange,
   SAFE_PACE_KG_PER_WEEK,
 } from './health.ts';
-import { addDays, toISODate } from './date.ts';
+import { addDays, ageFromBirthDate, toISODate } from './date.ts';
 import {
   METRIC_DIGITS,
   METRIC_FIELD,
@@ -503,6 +503,7 @@ function ruleWeightTrend(summaries: Record<MetricKey, MetricSummary>): Insight |
 function ruleWeightGoal(
   profile: Profile,
   summaries: Record<MetricKey, MetricSummary>,
+  age: number | null,
 ): Insight | null {
   const target = profile.targetWeightKg;
   const latest = latestWeight(summaries);
@@ -541,7 +542,7 @@ function ruleWeightGoal(
     },
   ];
 
-  const recommended = calorieTargetForGoal(profile, latest, target);
+  const recommended = calorieTargetForGoal(profile, latest, age, target);
   if (recommended !== null) {
     recommendations.push({
       title: `Aim for roughly ${fmt('calories', recommended)} kcal per day`,
@@ -870,12 +871,13 @@ function ruleStepsTrend(summaries: Record<MetricKey, MetricSummary>): Insight | 
 function ruleCalorieBalance(
   profile: Profile,
   summaries: Record<MetricKey, MetricSummary>,
+  age: number | null,
 ): Insight | null {
   const { count, average } = summaries.calories;
   if (count < MIN_DAYS_FOR_INSIGHTS || average === null) return null;
 
   const weight = latestWeight(summaries);
-  const estimatedBurn = weight === null ? null : totalDailyEnergyExpenditure(profile, weight);
+  const estimatedBurn = weight === null ? null : totalDailyEnergyExpenditure(profile, weight, age);
   const target = profile.dailyCalorieGoal ?? estimatedBurn;
 
   const avg = round(average, 0);
@@ -893,12 +895,12 @@ function ruleCalorieBalance(
       'energy',
       'info',
       'Intake logged, no target to compare against',
-      'Add age, sex and height to your profile to estimate how much you burn per day.',
+      'Add your birth date, sex and height to your profile to estimate how much you burn per day.',
       evidence,
       [
         {
           title: 'Complete your profile',
-          detail: 'Height, age, sex and activity level let the app estimate your maintenance calories.',
+          detail: 'Height, birth date, sex and activity level let the app estimate your maintenance calories.',
         },
       ],
     );
@@ -1061,6 +1063,7 @@ function ruleCalorieStability(summaries: Record<MetricKey, MetricSummary>): Insi
 function ruleCalorieWeightAlignment(
   profile: Profile,
   summaries: Record<MetricKey, MetricSummary>,
+  age: number | null,
 ): Insight | null {
   if (summaries.calories.count < MIN_DAYS_FOR_TREND) return null;
   if (summaries.weight.count < MIN_DAYS_FOR_TREND) return null;
@@ -1070,7 +1073,7 @@ function ruleCalorieWeightAlignment(
   const weight = latestWeight(summaries);
   if (weightTrend === null || calorieAvg === null || weight === null) return null;
 
-  const burn = totalDailyEnergyExpenditure(profile, weight) ?? profile.dailyCalorieGoal ?? null;
+  const burn = totalDailyEnergyExpenditure(profile, weight, age) ?? profile.dailyCalorieGoal ?? null;
   if (burn === null) return null;
 
   // Intake that would explain the weight we actually observe.
@@ -1143,6 +1146,10 @@ export function analyzeHealth(
   const windowEnd = referenceDate;
   const windowStart = addDays(windowEnd, -(windowDays - 1));
 
+  // Age is derived from the birth date against the reference date, so nothing
+  // in the rules touches the clock.
+  const age = ageFromBirthDate(profile.birthDate ?? '', referenceDate);
+
   const windowEntries = sortEntries(entries).filter(
     (entry) => entry.date >= windowStart && entry.date <= windowEnd,
   );
@@ -1161,15 +1168,15 @@ export function analyzeHealth(
   add(ruleMissingMetrics(summaries));
   add(ruleBmi(profile, summaries));
   add(ruleWeightTrend(summaries));
-  add(ruleWeightGoal(profile, summaries));
+  add(ruleWeightGoal(profile, summaries, age));
   add(ruleSleepAverage(profile, summaries));
   add(ruleSleepRegularity(summaries));
   add(ruleSleepWeightInteraction(summaries));
   add(ruleSteps(profile, summaries));
   add(ruleStepsTrend(summaries));
-  add(ruleCalorieBalance(profile, summaries));
+  add(ruleCalorieBalance(profile, summaries, age));
   add(ruleCalorieStability(summaries));
-  add(ruleCalorieWeightAlignment(profile, summaries));
+  add(ruleCalorieWeightAlignment(profile, summaries, age));
 
   const sorted = [...insights].sort((a, b) => {
     const bySeverity = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];

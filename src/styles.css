@@ -325,6 +325,11 @@ input:focus-visible {
   font-weight: 500;
 }
 
+.field__hint {
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
 .field--inline {
   gap: 4px;
 }

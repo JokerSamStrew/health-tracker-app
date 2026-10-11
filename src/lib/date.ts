@@ -46,6 +46,23 @@ export function daysBetween(from: string, to: string): number | null {
   return Math.round((b.getTime() - a.getTime()) / 86_400_000);
 }
 
+/**
+ * Whole completed years from `birthDate` up to `onDate`, so someone born on
+ * 1994-03-14 is 30 on 2024-03-14 but still 29 on 2024-03-13.
+ * Returns `null` when either date is malformed or `birthDate` is in the future.
+ */
+export function ageFromBirthDate(birthDate: string, onDate: string): number | null {
+  const birth = fromISODate(birthDate);
+  const now = fromISODate(onDate);
+  if (!birth || !now) return null;
+  let age = now.getFullYear() - birth.getFullYear();
+  const birthdayDone =
+    now.getMonth() > birth.getMonth() ||
+    (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
+  if (!birthdayDone) age -= 1;
+  return age < 0 ? null : age;
+}
+
 /** Inclusive list of dates from `start` to `end`, ascending. */
 export function dateRange(start: string, end: string): string[] {
   const span = daysBetween(start, end);

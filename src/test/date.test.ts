@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
+  ageFromBirthDate,
   dateRange,
   daysBetween,
   formatLongDate,
@@ -167,5 +168,32 @@ describe('formatLongDate', () => {
 
   it('returns the raw string when the date is invalid', () => {
     expect(formatLongDate('bad')).toBe('bad');
+  });
+});
+
+describe('ageFromBirthDate', () => {
+  it('counts whole completed years', () => {
+    // Turns 30 exactly on the reference date, so it counts as 30.
+    expect(ageFromBirthDate('1994-03-14', '2024-03-14')).toBe(30);
+    // A day before the birthday means the 30th is not complete yet.
+    expect(ageFromBirthDate('1994-03-15', '2024-03-14')).toBe(29);
+    // The birthday has passed months ago, so the full years count.
+    expect(ageFromBirthDate('1984-01-01', '2024-03-14')).toBe(40);
+  });
+
+  it('treats a leap-day birthday as elapsed from 1 March in common years', () => {
+    // Born 2000-02-29: 24 on 2024-03-01, but still 23 on 2024-02-28.
+    expect(ageFromBirthDate('2000-02-29', '2024-03-01')).toBe(24);
+    expect(ageFromBirthDate('2000-02-29', '2024-02-28')).toBe(23);
+  });
+
+  it('returns null when either date is malformed', () => {
+    expect(ageFromBirthDate('1994-02-31', '2024-03-14')).toBeNull();
+    expect(ageFromBirthDate('1994-03-14', 'not-a-date')).toBeNull();
+    expect(ageFromBirthDate('', '2024-03-14')).toBeNull();
+  });
+
+  it('returns null when the birth date is in the future', () => {
+    expect(ageFromBirthDate('2025-01-01', '2024-03-14')).toBeNull();
   });
 });

@@ -169,6 +169,7 @@ export default function App() {
             <ProfilePanel
               profile={profile}
               latestWeightKg={latestWeight}
+              referenceDate={today}
               onChange={updateProfile}
               onClearAll={clearAll}
             />

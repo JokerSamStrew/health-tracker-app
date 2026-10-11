@@ -126,8 +126,8 @@ export function sanitizeProfile(value: unknown): Profile {
   const name = coerceString(value.name, 60);
   if (name) profile.name = name;
 
-  const age = coerceOptionalNumber(value.age, 13, 120);
-  if (age !== undefined) profile.age = age;
+  const birthDate = coerceString(value.birthDate, 10);
+  if (birthDate && isValidISODate(birthDate)) profile.birthDate = birthDate;
 
   if (value.sex === 'male' || value.sex === 'female') profile.sex = value.sex;
 

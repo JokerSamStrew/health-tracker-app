@@ -254,8 +254,8 @@ describe('EntryForm', () => {
     render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
 
     await user.type(screen.getByLabelText(/note/i), 'Long run');
-    await user.click(screen.getByRole('button', { name: 'Calm or Peaceful' }));
-    expect(screen.getByLabelText(/note/i)).toHaveValue('Long run, Calm or Peaceful');
+    await user.click(screen.getByRole('button', { name: 'Calm' }));
+    expect(screen.getByLabelText(/note/i)).toHaveValue('Long run, Calm');
   });
 
   it('does not duplicate a quick tag already in the note', async () => {
@@ -504,7 +504,7 @@ describe('BackupPanel', () => {
     render(
       <BackupPanel
         entries={makeEntries(2)}
-        profile={{ age: 30 }}
+        profile={{ birthDate: '1994-03-14' }}
         referenceDate={REFERENCE}
         onImport={vi.fn()}
       />,
@@ -521,7 +521,7 @@ describe('BackupPanel', () => {
     expect(payload.format).toBe('health-tracker');
     expect(payload.version).toBe(1);
     expect(payload.entries).toHaveLength(2);
-    expect(payload.profile).toEqual({ age: 30 });
+    expect(payload.profile).toEqual({ birthDate: '1994-03-14' });
     expect(screen.getByRole('status')).toHaveTextContent(/exported 2 entries/i);
   });
 
@@ -537,7 +537,7 @@ describe('BackupPanel', () => {
       version: 1,
       exportedAt: '2024-03-14T12:00:00.000Z',
       entries: [{ date: '2024-03-10', steps: 9000, weightKg: 80.5 }],
-      profile: { age: 30 },
+      profile: { birthDate: '1994-03-14' },
     });
     const file = new File([backup], 'backup.json', { type: 'application/json' });
     await user.upload(screen.getByLabelText(/backup file/i), file);
@@ -547,7 +547,7 @@ describe('BackupPanel', () => {
     await waitFor(() => {
       expect(onImport).toHaveBeenCalledWith(
         [{ date: '2024-03-10', steps: 9000, weightKg: 80.5 }],
-        { age: 30 },
+        { birthDate: '1994-03-14' },
       );
     });
     expect(await screen.findByRole('status')).toHaveTextContent(/imported 1 entries/i);
@@ -596,13 +596,16 @@ describe('ProfilePanel', () => {
   it('shows energy estimates once enough is known', () => {
     render(
       <ProfilePanel
-        profile={{ age: 30, sex: 'male', heightCm: 180 }}
+        profile={{ birthDate: '1994-03-14', sex: 'male', heightCm: 180 }}
         latestWeightKg={80}
+        referenceDate={REFERENCE}
         onChange={vi.fn()}
         onClearAll={vi.fn()}
       />,
     );
-    // Mifflin-St Jeor: 10*80 + 6.25*180 - 5*30 + 5 = 1780 kcal, x1.55 = 2759.
+    // Birth date 1994-03-14 on 2024-03-14 is exactly 30 years old:
+    // Mifflin-St Jeor 10*80 + 6.25*180 - 5*30 + 5 = 1780 kcal, x1.55 = 2759.
+    expect(screen.getByText(/that is 30 years old today/i)).toBeInTheDocument();
     expect(screen.getByText(/estimated daily burn/i)).toBeInTheDocument();
     expect(screen.getByText('1,780 kcal')).toBeInTheDocument();
     expect(screen.getByText('2,759 kcal')).toBeInTheDocument();
@@ -610,9 +613,15 @@ describe('ProfilePanel', () => {
 
   it('asks for the missing inputs when it cannot estimate', () => {
     render(
-      <ProfilePanel profile={{}} latestWeightKg={null} onChange={vi.fn()} onClearAll={vi.fn()} />,
+      <ProfilePanel
+        profile={{}}
+        latestWeightKg={null}
+        referenceDate={REFERENCE}
+        onChange={vi.fn()}
+        onClearAll={vi.fn()}
+      />,
     );
-    expect(screen.getByText(/needs age, sex, height and weight/i)).toBeInTheDocument();
+    expect(screen.getByText(/needs birth date, sex, height and weight/i)).toBeInTheDocument();
   });
 
   it('reports profile changes', async () => {
@@ -620,8 +629,9 @@ describe('ProfilePanel', () => {
     const onChange = vi.fn();
     render(
       <ProfilePanel
-        profile={{ age: 30, sex: 'male', heightCm: 180 }}
+        profile={{ birthDate: '1994-03-14', sex: 'male', heightCm: 180 }}
         latestWeightKg={80}
+        referenceDate={REFERENCE}
         onChange={onChange}
         onClearAll={vi.fn()}
       />,
@@ -641,7 +651,13 @@ describe('ProfilePanel', () => {
     const user = userEvent.setup();
     const onClearAll = vi.fn();
     render(
-      <ProfilePanel profile={{}} latestWeightKg={null} onChange={vi.fn()} onClearAll={onClearAll} />,
+      <ProfilePanel
+        profile={{}}
+        latestWeightKg={null}
+        referenceDate={REFERENCE}
+        onChange={vi.fn()}
+        onClearAll={onClearAll}
+      />,
     );
 
     await user.click(screen.getByRole('button', { name: /delete all data/i }));
@@ -655,7 +671,13 @@ describe('ProfilePanel', () => {
     const user = userEvent.setup();
     const onClearAll = vi.fn();
     render(
-      <ProfilePanel profile={{}} latestWeightKg={null} onChange={vi.fn()} onClearAll={onClearAll} />,
+      <ProfilePanel
+        profile={{}}
+        latestWeightKg={null}
+        referenceDate={REFERENCE}
+        onChange={vi.fn()}
+        onClearAll={onClearAll}
+      />,
     );
 
     await user.click(screen.getByRole('button', { name: /delete all data/i }));

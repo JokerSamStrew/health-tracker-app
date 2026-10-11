@@ -34,7 +34,7 @@ function insightById(insights: Insight[], id: string): Insight {
 }
 
 const BASE_PROFILE: Profile = {
-  age: 30,
+  birthDate: '1994-03-14',
   sex: 'male',
   heightCm: 180,
   activityLevel: 'moderate',

@@ -4,8 +4,8 @@ A local-first web app for logging daily health metrics and turning that log into
 detected problems plus concrete recommendations.
 
 Four metrics are tracked per day — **weight**, **steps**, **sleep quality** and
-**calories eaten** — and optional profile data (age, sex, height, activity level,
-goals) unlocks the energy-balance and goal-tracking analysis.
+**calories eaten** — and optional profile data (birth date, sex, height,
+activity level, goals) unlocks the energy-balance and goal-tracking analysis.
 
 > Not medical advice. The app surfaces patterns in your own logs; it does not
 > diagnose anything. Talk to a doctor about health concerns.
@@ -127,7 +127,7 @@ balance, calorie stability, and intake-vs-weight agreement.
 pnpm test
 ```
 
-363 tests across 10 files, mirroring the `lib/` modules one-to-one, plus component
+368 tests across 10 files, mirroring the `lib/` modules one-to-one, plus component
 and hook tests. Notable techniques:
 
 - Determinism: tests always pass an explicit `referenceDate`, so no assertion

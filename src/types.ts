@@ -45,7 +45,8 @@ export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'ath
 
 export interface Profile {
   name?: string;
-  age?: number;
+  /** ISO calendar date of birth, `YYYY-MM-DD`. Age is derived from it. */
+  birthDate?: string;
   sex?: Sex;
   heightCm?: number;
   activityLevel?: ActivityLevel;

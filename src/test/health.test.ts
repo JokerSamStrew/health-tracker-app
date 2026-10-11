@@ -14,7 +14,7 @@ import {
 import type { ActivityLevel, Profile, Sex } from '../types.ts';
 
 function profile(overrides: Partial<Profile> = {}): Profile {
-  return { age: 30, sex: 'male', heightCm: 180, activityLevel: 'moderate', ...overrides };
+  return { sex: 'male', heightCm: 180, activityLevel: 'moderate', ...overrides };
 }
 
 describe('bmi', () => {
@@ -69,64 +69,69 @@ describe('bmiCategory', () => {
 describe('basalMetabolicRate', () => {
   it('matches the Mifflin-St Jeor formula for men', () => {
     // 10*80 + 6.25*180 - 5*30 + 5 = 1780
-    expect(basalMetabolicRate(profile(), 80)).toBe(1780);
+    expect(basalMetabolicRate(profile(), 80, 30)).toBe(1780);
   });
 
   it('matches the Mifflin-St Jeor formula for women', () => {
     // 10*65 + 6.25*165 - 5*30 - 161 = 1370.25
-    expect(basalMetabolicRate(profile({ sex: 'female', heightCm: 165 }), 65)).toBeCloseTo(
+    expect(basalMetabolicRate(profile({ sex: 'female', heightCm: 165 }), 65, 30)).toBeCloseTo(
       1370.25,
       5,
     );
   });
 
   it('is lower for women than men at the same inputs', () => {
-    const male = basalMetabolicRate(profile({ sex: 'male' }), 70)!;
-    const female = basalMetabolicRate(profile({ sex: 'female' }), 70)!;
+    const male = basalMetabolicRate(profile({ sex: 'male' }), 70, 30)!;
+    const female = basalMetabolicRate(profile({ sex: 'female' }), 70, 30)!;
     expect(female).toBeLessThan(male);
   });
 
-  it('returns null without age', () => {
-    expect(basalMetabolicRate({ sex: 'male', heightCm: 180 }, 80)).toBeNull();
+  it('returns null without an age', () => {
+    expect(basalMetabolicRate({ sex: 'male', heightCm: 180 }, 80, null)).toBeNull();
   });
 
   it('returns null without a valid sex', () => {
-    expect(basalMetabolicRate({ age: 30, heightCm: 180 }, 80)).toBeNull();
+    expect(basalMetabolicRate({ heightCm: 180 }, 80, 30)).toBeNull();
   });
 
   it('returns null for a non-positive weight', () => {
-    expect(basalMetabolicRate(profile(), 0)).toBeNull();
+    expect(basalMetabolicRate(profile(), 0, 30)).toBeNull();
+  });
+
+  it('rejects ages outside the supported adult range', () => {
+    expect(basalMetabolicRate(profile(), 80, 12)).toBeNull();
+    expect(basalMetabolicRate(profile(), 80, 121)).toBeNull();
+    expect(basalMetabolicRate(profile(), 80, 13)).not.toBeNull();
+    expect(basalMetabolicRate(profile(), 80, 120)).not.toBeNull();
   });
 });
 
 describe('totalDailyEnergyExpenditure', () => {
   it('multiplies BMR by the activity multiplier', () => {
-    const bmr = basalMetabolicRate(profile(), 80)!;
-    expect(totalDailyEnergyExpenditure(profile(), 80)).toBeCloseTo(bmr * 1.55, 5);
+    const bmr = basalMetabolicRate(profile(), 80, 30)!;
+    expect(totalDailyEnergyExpenditure(profile(), 80, 30)).toBeCloseTo(bmr * 1.55, 5);
   });
 
   it('increases with activity level', () => {
-    const sedentary = totalDailyEnergyExpenditure(profile({ activityLevel: 'sedentary' }), 80)!;
-    const active = totalDailyEnergyExpenditure(profile({ activityLevel: 'active' }), 80)!;
-    const athlete = totalDailyEnergyExpenditure(profile({ activityLevel: 'athlete' }), 80)!;
+    const sedentary = totalDailyEnergyExpenditure(profile({ activityLevel: 'sedentary' }), 80, 30)!;
+    const active = totalDailyEnergyExpenditure(profile({ activityLevel: 'active' }), 80, 30)!;
+    const athlete = totalDailyEnergyExpenditure(profile({ activityLevel: 'athlete' }), 80, 30)!;
     expect(sedentary).toBeLessThan(active);
     expect(active).toBeLessThan(athlete);
   });
 
   it('defaults to moderate when activity level is unset', () => {
-    const noLevel = totalDailyEnergyExpenditure(
-      { age: 30, sex: 'male', heightCm: 180 },
-      80,
-    )!;
+    const noLevel = totalDailyEnergyExpenditure({ sex: 'male', heightCm: 180 }, 80, 30)!;
     const moderate = totalDailyEnergyExpenditure(
-      { age: 30, sex: 'male', heightCm: 180, activityLevel: 'moderate' },
+      { sex: 'male', heightCm: 180, activityLevel: 'moderate' },
       80,
+      30,
     )!;
     expect(noLevel).toBe(moderate);
   });
 
   it('returns null when BMR cannot be computed', () => {
-    expect(totalDailyEnergyExpenditure({}, 80)).toBeNull();
+    expect(totalDailyEnergyExpenditure({}, 80, null)).toBeNull();
   });
 
   it('has a multiplier above 1 for every activity level', () => {
@@ -171,58 +176,58 @@ describe('dailyCalorieDeltaForWeightChange', () => {
 
 describe('calorieTargetForGoal', () => {
   it('returns maintenance calories when already at target', () => {
-    const target = calorieTargetForGoal(profile(), 80, 80)!;
-    expect(target).toBeCloseTo(totalDailyEnergyExpenditure(profile(), 80)!, 5);
+    const target = calorieTargetForGoal(profile(), 80, 30, 80)!;
+    expect(target).toBeCloseTo(totalDailyEnergyExpenditure(profile(), 80, 30)!, 5);
   });
 
   it('subtracts calories to lose weight', () => {
-    const tdee = totalDailyEnergyExpenditure(profile(), 80)!;
-    const target = calorieTargetForGoal(profile(), 80, 75)!;
+    const tdee = totalDailyEnergyExpenditure(profile(), 80, 30)!;
+    const target = calorieTargetForGoal(profile(), 80, 30, 75)!;
     expect(target).toBeLessThan(tdee);
   });
 
   it('adds calories to gain weight', () => {
-    const tdee = totalDailyEnergyExpenditure(profile(), 80)!;
-    const target = calorieTargetForGoal(profile(), 80, 85)!;
+    const tdee = totalDailyEnergyExpenditure(profile(), 80, 30)!;
+    const target = calorieTargetForGoal(profile(), 80, 30, 85)!;
     expect(target).toBeGreaterThan(tdee);
   });
 
   it('spreads a large gap over a safe weekly pace', () => {
-    const tdee = totalDailyEnergyExpenditure(profile(), 80)!;
+    const tdee = totalDailyEnergyExpenditure(profile(), 80, 30)!;
     // 0.45 kg/week -> 0.45 * 7700 / 7 = 495 kcal/day below maintenance.
     const expected = tdee - dailyCalorieDeltaForWeightChange(0.45);
-    expect(calorieTargetForGoal(profile(), 80, 70)).toBeCloseTo(expected, 5);
-    expect(calorieTargetForGoal(profile(), 80, 79)).toBeCloseTo(expected, 5);
+    expect(calorieTargetForGoal(profile(), 80, 30, 70)).toBeCloseTo(expected, 5);
+    expect(calorieTargetForGoal(profile(), 80, 30, 79)).toBeCloseTo(expected, 5);
   });
 
   it('scales the gap for a close target', () => {
-    const tdee = totalDailyEnergyExpenditure(profile(), 80)!;
+    const tdee = totalDailyEnergyExpenditure(profile(), 80, 30)!;
     // A 0.2 kg gap is under the 0.45 kg cap, so it is applied proportionally.
-    const target = calorieTargetForGoal(profile(), 80, 79.8)!;
+    const target = calorieTargetForGoal(profile(), 80, 30, 79.8)!;
     expect(target).toBeCloseTo(tdee - dailyCalorieDeltaForWeightChange(0.2), 5);
   });
 
   it('never drops below the conservative floor', () => {
-    const target = calorieTargetForGoal(profile({ activityLevel: 'sedentary' }), 45, 25)!;
+    const target = calorieTargetForGoal(profile({ activityLevel: 'sedentary' }), 45, 30, 25)!;
     expect(target).toBeGreaterThanOrEqual(1500);
   });
 
   it('applies the lower floor for women', () => {
-    const target = calorieTargetForGoal(profile({ sex: 'female', heightCm: 160 }), 45, 30)!;
+    const target = calorieTargetForGoal(profile({ sex: 'female', heightCm: 160 }), 45, 30, 30)!;
     expect(target).toBeGreaterThanOrEqual(1200);
   });
 
   it('returns null when the burn cannot be estimated', () => {
-    expect(calorieTargetForGoal({}, 80, 75)).toBeNull();
+    expect(calorieTargetForGoal({}, 80, null, 75)).toBeNull();
   });
 
   it('returns null for a non-finite target', () => {
-    expect(calorieTargetForGoal(profile(), 80, Number.NaN)).toBeNull();
+    expect(calorieTargetForGoal(profile(), 80, 30, Number.NaN)).toBeNull();
   });
 
   it('treats a tiny gap as "already there"', () => {
-    const tdee = totalDailyEnergyExpenditure(profile(), 80)!;
-    expect(calorieTargetForGoal(profile(), 80, 80.02)).toBeCloseTo(tdee, 5);
+    const tdee = totalDailyEnergyExpenditure(profile(), 80, 30)!;
+    expect(calorieTargetForGoal(profile(), 80, 30, 80.02)).toBeCloseTo(tdee, 5);
   });
 });
 
@@ -230,7 +235,7 @@ describe('sex type usage', () => {
   it('only accepts male or female', () => {
     const sexes: Sex[] = ['male', 'female'];
     for (const sex of sexes) {
-      expect(basalMetabolicRate(profile({ sex }), 80)).not.toBeNull();
+      expect(basalMetabolicRate(profile({ sex }), 80, 30)).not.toBeNull();
     }
   });
 });

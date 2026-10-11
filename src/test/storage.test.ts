@@ -120,7 +120,7 @@ describe('sanitizeProfile', () => {
   it('keeps valid fields', () => {
     const profile = sanitizeProfile({
       name: ' Sam ',
-      age: 30,
+      birthDate: '1994-03-14',
       sex: 'male',
       heightCm: 180,
       activityLevel: 'active',
@@ -131,7 +131,7 @@ describe('sanitizeProfile', () => {
     });
     expect(profile).toEqual({
       name: 'Sam',
-      age: 30,
+      birthDate: '1994-03-14',
       sex: 'male',
       heightCm: 180,
       activityLevel: 'active',
@@ -143,11 +143,13 @@ describe('sanitizeProfile', () => {
   });
 
   it('drops unknown fields', () => {
-    expect(sanitizeProfile({ age: 30, isAdmin: true })).toEqual({ age: 30 });
+    expect(sanitizeProfile({ birthDate: '1994-03-14', isAdmin: true })).toEqual({
+      birthDate: '1994-03-14',
+    });
   });
 
   it('drops out-of-range values', () => {
-    expect(sanitizeProfile({ age: 5 })).toEqual({});
+    expect(sanitizeProfile({ birthDate: 'not-a-date' })).toEqual({});
     expect(sanitizeProfile({ heightCm: 400 })).toEqual({});
     expect(sanitizeProfile({ sleepGoalQuality: 6 })).toEqual({});
   });
@@ -162,8 +164,8 @@ describe('sanitizeProfile', () => {
     expect(sanitizeProfile('nope')).toEqual({});
   });
 
-  it('coerces numeric strings', () => {
-    expect(sanitizeProfile({ age: '30' })).toEqual({ age: 30 });
+  it('keeps a birth date given as text', () => {
+    expect(sanitizeProfile({ birthDate: '1994-03-14' })).toEqual({ birthDate: '1994-03-14' });
   });
 });
 
@@ -192,8 +194,8 @@ describe('save / load round-trip', () => {
 
   it('round-trips a profile', () => {
     const storage = createMemoryStorage();
-    saveProfile(storage, { age: 30, sex: 'female', heightCm: 165 });
-    expect(loadProfile(storage)).toEqual({ age: 30, sex: 'female', heightCm: 165 });
+    saveProfile(storage, { birthDate: '1994-03-14', sex: 'female', heightCm: 165 });
+    expect(loadProfile(storage)).toEqual({ birthDate: '1994-03-14', sex: 'female', heightCm: 165 });
   });
 });
 
@@ -239,7 +241,7 @@ describe('clearState', () => {
   it('removes every key', () => {
     const storage = createMemoryStorage();
     saveEntries(storage, [{ date: '2024-03-01', steps: 1 }]);
-    saveProfile(storage, { age: 30 });
+    saveProfile(storage, { birthDate: '1994-03-14' });
 
     clearState(storage);
 

@@ -10,7 +10,7 @@ describe('buildBackup', () => {
         { date: '2024-03-03', steps: 3 },
         { date: '2024-03-01', steps: 1, weightKg: 80 },
       ],
-      { name: 'Sam', age: 30 },
+      { name: 'Sam', birthDate: '1994-03-14' },
       EXPORTED_AT,
     );
     const parsed = JSON.parse(json) as Record<string, unknown>;
@@ -18,7 +18,7 @@ describe('buildBackup', () => {
     expect(parsed.format).toBe(BACKUP_FORMAT);
     expect(parsed.version).toBe(BACKUP_VERSION);
     expect(parsed.exportedAt).toBe(EXPORTED_AT);
-    expect(parsed.profile).toEqual({ name: 'Sam', age: 30 });
+    expect(parsed.profile).toEqual({ name: 'Sam', birthDate: '1994-03-14' });
     expect((parsed.entries as Array<{ date: string }>).map((entry) => entry.date)).toEqual([
       '2024-03-01',
       '2024-03-03',
@@ -29,7 +29,7 @@ describe('buildBackup', () => {
 describe('parseBackup', () => {
   it('round-trips an export', () => {
     const entries = [{ date: '2024-03-01', steps: 9000, weightKg: 80 }];
-    const profile = { name: 'Sam', age: 30, sex: 'male' as const };
+    const profile = { name: 'Sam', birthDate: '1994-03-14', sex: 'male' as const };
     const result = parseBackup(buildBackup(entries, profile, EXPORTED_AT));
 
     expect(result).toEqual({ entries, profile, dropped: 0 });
@@ -102,11 +102,11 @@ describe('parseBackup', () => {
         version: BACKUP_VERSION,
         exportedAt: EXPORTED_AT,
         entries: [],
-        profile: { age: '30', isAdmin: true, sex: 'other' },
+        profile: { birthDate: '1994-03-14', isAdmin: true, sex: 'other' },
       }),
     );
 
-    expect(result?.profile).toEqual({ age: 30 });
+    expect(result?.profile).toEqual({ birthDate: '1994-03-14' });
   });
 
   it('falls back to empty state when entries or profile are missing', () => {

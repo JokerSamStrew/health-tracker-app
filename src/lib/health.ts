@@ -60,10 +60,20 @@ export function bmiCategory(value: number): BmiCategory | null {
   return 'obese-iii';
 }
 
-/** Mifflin-St Jeor basal metabolic rate (kcal/day). */
-export function basalMetabolicRate(profile: Profile, weightKg: number): number | null {
-  const { age, sex } = profile;
-  if (!Number.isFinite(age) || age === undefined) return null;
+/**
+ * Mifflin-St Jeor basal metabolic rate (kcal/day).
+ *
+ * `age` is derived from the profile's birth date against the analysis
+ * reference date before it gets here, so the function stays date-free.
+ * Ages outside the supported adult range (13-120) yield `null`.
+ */
+export function basalMetabolicRate(
+  profile: Profile,
+  weightKg: number,
+  age: number | null,
+): number | null {
+  const { sex } = profile;
+  if (age === null || !Number.isFinite(age) || age < 13 || age > 120) return null;
   if (sex !== 'male' && sex !== 'female') return null;
   if (!Number.isFinite(weightKg) || weightKg <= 0) return null;
 
@@ -72,8 +82,12 @@ export function basalMetabolicRate(profile: Profile, weightKg: number): number |
 }
 
 /** Estimated total daily energy expenditure (kcal/day). */
-export function totalDailyEnergyExpenditure(profile: Profile, weightKg: number): number | null {
-  const bmr = basalMetabolicRate(profile, weightKg);
+export function totalDailyEnergyExpenditure(
+  profile: Profile,
+  weightKg: number,
+  age: number | null,
+): number | null {
+  const bmr = basalMetabolicRate(profile, weightKg, age);
   if (bmr === null) return null;
   const multiplier = ACTIVITY_MULTIPLIERS[profile.activityLevel ?? 'moderate'];
   return bmr * multiplier;
@@ -109,9 +123,10 @@ export const SAFE_PACE_KG_PER_WEEK = 0.45;
 export function calorieTargetForGoal(
   profile: Profile,
   weightKg: number,
+  age: number | null,
   targetWeightKg: number,
 ): number | null {
-  const tdee = totalDailyEnergyExpenditure(profile, weightKg);
+  const tdee = totalDailyEnergyExpenditure(profile, weightKg, age);
   if (tdee === null) return null;
   if (!Number.isFinite(targetWeightKg)) return null;
 

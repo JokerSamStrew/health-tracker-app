@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { ageFromBirthDate } from '../lib/date.ts';
 import {
   ACTIVITY_LABELS,
   ACTIVITY_MULTIPLIERS,
@@ -12,6 +13,8 @@ export interface ProfilePanelProps {
   profile: Profile;
   /** Latest logged weight, used to estimate burn. `null` when there is none. */
   latestWeightKg: number | null;
+  /** `YYYY-MM-DD` used as "today", so age can be derived from the birth date. */
+  referenceDate: string;
   onChange: (patch: Profile) => void;
   onClearAll: () => void;
 }
@@ -20,7 +23,7 @@ const ACTIVITY_LEVELS = Object.keys(ACTIVITY_MULTIPLIERS) as ActivityLevel[];
 
 type FormState = {
   name: string;
-  age: string;
+  birthDate: string;
   sex: string;
   heightCm: string;
   activityLevel: ActivityLevel;
@@ -33,7 +36,7 @@ type FormState = {
 function toFormState(profile: Profile): FormState {
   return {
     name: profile.name ?? '',
-    age: profile.age !== undefined ? String(profile.age) : '',
+    birthDate: profile.birthDate ?? '',
     sex: profile.sex ?? '',
     heightCm: profile.heightCm !== undefined ? String(profile.heightCm) : '',
     activityLevel: profile.activityLevel ?? 'moderate',
@@ -54,6 +57,7 @@ function optionalNumber(raw: string): number | undefined {
 export function ProfilePanel({
   profile,
   latestWeightKg,
+  referenceDate,
   onChange,
   onClearAll,
 }: ProfilePanelProps) {
@@ -64,7 +68,7 @@ export function ProfilePanel({
   // omitted so `updateProfile` can merge them into the stored profile.
   const parsedProfile: Profile = {
     ...(form.name.trim() !== '' ? { name: form.name.trim() } : {}),
-    ...(optionalNumber(form.age) !== undefined ? { age: optionalNumber(form.age) } : {}),
+    ...(form.birthDate.trim() !== '' ? { birthDate: form.birthDate.trim() } : {}),
     ...(form.sex === 'male' || form.sex === 'female' ? { sex: form.sex as Sex } : {}),
     ...(optionalNumber(form.heightCm) !== undefined
       ? { heightCm: optionalNumber(form.heightCm) }
@@ -84,9 +88,10 @@ export function ProfilePanel({
       : {}),
   };
 
-  const bmr = latestWeightKg !== null ? basalMetabolicRate(parsedProfile, latestWeightKg) : null;
+  const age = ageFromBirthDate(parsedProfile.birthDate ?? '', referenceDate);
+  const bmr = latestWeightKg !== null ? basalMetabolicRate(parsedProfile, latestWeightKg, age) : null;
   const tdee =
-    latestWeightKg !== null ? totalDailyEnergyExpenditure(parsedProfile, latestWeightKg) : null;
+    latestWeightKg !== null ? totalDailyEnergyExpenditure(parsedProfile, latestWeightKg, age) : null;
 
   function update<K extends keyof FormState>(field: K, value: FormState[K]): void {
     setForm((current) => ({ ...current, [field]: value }));
@@ -123,17 +128,19 @@ export function ProfilePanel({
           </label>
 
           <label className="field">
-            <span>Age</span>
+            <span>Birth date</span>
             <input
-              type="number"
-              inputMode="numeric"
-              min={13}
-              max={120}
-              value={form.age}
-              placeholder="32"
-              onChange={(event) => update('age', event.target.value)}
+              type="date"
+              min="1900-01-01"
+              max={referenceDate}
+              value={form.birthDate}
+              placeholder="1992-06-15"
+              onChange={(event) => update('birthDate', event.target.value)}
               onBlur={commit}
             />
+            <small className="field__hint">
+              {age !== null ? `That is ${age} years old today` : 'Age is worked out from this date'}
+            </small>
           </label>
 
           <label className="field">
@@ -243,7 +250,7 @@ export function ProfilePanel({
       <dl className="profile__estimates">
         <div>
           <dt>Basal metabolic rate</dt>
-          <dd>{bmr !== null ? `${formatNumber(bmr, 0)} kcal` : 'Needs age, sex, height and weight'}</dd>
+          <dd>{bmr !== null ? `${formatNumber(bmr, 0)} kcal` : 'Needs birth date, sex, height and weight'}</dd>
         </div>
         <div>
           <dt>Estimated daily burn</dt>
