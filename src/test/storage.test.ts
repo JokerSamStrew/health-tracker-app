@@ -4,12 +4,14 @@ import {
   createMemoryStorage,
   loadProfile,
   loadState,
+  loadTheme,
   resolveStorage,
   sanitizeEntries,
   sanitizeEntry,
   sanitizeProfile,
   saveEntries,
   saveProfile,
+  saveTheme,
   SCHEMA_VERSION,
   STORAGE_KEYS,
 } from '../lib/storage.ts';
@@ -270,5 +272,30 @@ describe('resolveStorage', () => {
     storage.setItem('probe', 'ok');
     expect(storage.getItem('probe')).toBe('ok');
     storage.removeItem('probe');
+  });
+});
+
+describe('theme storage', () => {
+  it('loads a saved theme', () => {
+    const storage = createMemoryStorage({ [STORAGE_KEYS.theme]: 'dark' });
+    expect(loadTheme(storage)).toBe('dark');
+  });
+
+  it('treats anything but light or dark as absent', () => {
+    const storage = createMemoryStorage({ [STORAGE_KEYS.theme]: 'midnight' });
+    expect(loadTheme(storage)).toBeNull();
+  });
+
+  it('round-trips a theme through save and load', () => {
+    const storage = createMemoryStorage();
+    saveTheme(storage, 'dark');
+    expect(storage.getItem(STORAGE_KEYS.theme)).toBe('dark');
+    expect(loadTheme(storage)).toBe('dark');
+  });
+
+  it('survives clearState, which only wipes health data', () => {
+    const storage = createMemoryStorage({ [STORAGE_KEYS.theme]: 'dark' });
+    clearState(storage);
+    expect(loadTheme(storage)).toBe('dark');
   });
 });

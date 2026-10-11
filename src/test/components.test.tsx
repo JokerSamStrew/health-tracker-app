@@ -7,6 +7,7 @@ import { HistoryTable } from '../components/HistoryTable.tsx';
 import { InsightsPanel } from '../components/InsightsPanel.tsx';
 import { SummaryCards } from '../components/SummaryCards.tsx';
 import { ProfilePanel } from '../components/ProfilePanel.tsx';
+import { ThemeToggle } from '../components/ThemeToggle.tsx';
 import { TimeSeriesChart } from '../components/TimeSeriesChart.tsx';
 import { analyzeHealth } from '../lib/insights.ts';
 import { buildChartData } from '../lib/charts.ts';
@@ -838,6 +839,21 @@ describe('TimeSeriesChart', () => {
     expect(container.querySelector('.recharts-reference-line')).not.toBeNull();
   });
 
+  it('renders with the dark theme palette', () => {
+    const { container } = render(
+      <TimeSeriesChart
+        title="Steps"
+        metric="steps"
+        data={data}
+        summary={report.summaries.steps}
+        theme="dark"
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Steps' })).toBeInTheDocument();
+    expect(container.querySelector('.recharts-line')).not.toBeNull();
+  });
+
   it('shows an empty state instead of a chart when nothing is logged', () => {
     const empty = analyzeHealth([], {}, { referenceDate: REFERENCE });
     const { container } = render(
@@ -851,6 +867,26 @@ describe('TimeSeriesChart', () => {
 
     expect(screen.getByText(/log sleep for at least one day/i)).toBeInTheDocument();
     expect(container.querySelector('.recharts-wrapper')).toBeNull();
+  });
+});
+
+describe('ThemeToggle', () => {
+  it('names the theme it would switch to and reports it', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    const { rerender } = render(<ThemeToggle theme="light" onToggle={onToggle} />);
+
+    expect(screen.getByRole('button', { name: /switch to dark theme/i })).toBeInTheDocument();
+    expect(screen.getByText('Dark')).toBeInTheDocument();
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(screen.getByRole('button'));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+
+    rerender(<ThemeToggle theme="dark" onToggle={onToggle} />);
+    expect(screen.getByRole('button', { name: /switch to light theme/i })).toBeInTheDocument();
+    expect(screen.getByText('Light')).toBeInTheDocument();
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true');
   });
 });
 

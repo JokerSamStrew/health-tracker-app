@@ -8,6 +8,24 @@
       name="description"
       content="Track weight, steps, sleep and calories over time and get insight into your health."
     />
+    <script>
+      // Apply the theme before first paint so a dark-mode user never sees a
+      // light flash. Keep the localStorage key in sync with STORAGE_KEYS.theme
+      // in src/lib/storage.ts; useTheme owns the state once React mounts.
+      (function () {
+        try {
+          var saved = localStorage.getItem('health-tracker:theme');
+          var dark =
+            saved === 'dark' ||
+            (saved !== 'light' &&
+              typeof window.matchMedia === 'function' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        } catch (error) {
+          // localStorage unavailable (private mode): stay with the default.
+        }
+      })();
+    </script>
     <title>Health Tracker</title>
   </head>
   <body>

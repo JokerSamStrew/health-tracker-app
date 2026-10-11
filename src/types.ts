@@ -43,6 +43,9 @@ export type Sex = 'male' | 'female';
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'athlete';
 
+/** UI theme. A persisted preference, not part of the health model. */
+export type ThemeMode = 'light' | 'dark';
+
 export interface Profile {
   name?: string;
   /** ISO calendar date of birth, `YYYY-MM-DD`. Age is derived from it. */

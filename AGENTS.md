@@ -69,6 +69,8 @@ src/lib/charts.ts   Recharts-shaped points, null gaps, padded axis domains.
 src/lib/storage.ts  localStorage read/write, sanitizing, memory fake.
 src/lib/backup.ts   JSON export/import envelope for entries + profile.
 src/hooks/          useHealthData: state + persistence + memoized report.
+                    useTheme: light/dark theme state, persisted, mirrored to
+                    <html data-theme> (no-flash script in index.html).
 src/components/     Presentational React only; props in, no store access.
 ```
 

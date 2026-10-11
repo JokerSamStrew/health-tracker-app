@@ -12,7 +12,7 @@ import {
 import { CHART_KEYS, isEmptySeries, metricValues, paddedDomain, type ChartPoint } from '../lib/charts.ts';
 import { formatLongDate } from '../lib/date.ts';
 import { formatMetric, formatNumber } from '../lib/stats.ts';
-import type { MetricKey, MetricSummary } from '../types.ts';
+import type { MetricKey, MetricSummary, ThemeMode } from '../types.ts';
 import { METRIC_UNITS } from '../types.ts';
 
 export interface TimeSeriesChartProps {
@@ -24,14 +24,31 @@ export interface TimeSeriesChartProps {
   goal?: number;
   goalLabel?: string;
   height?: number;
+  /** Visual theme; defaults to 'light'. */
+  theme?: ThemeMode;
   color?: string;
 }
 
-const DEFAULT_COLORS: Record<MetricKey, string> = {
-  weight: '#0f766e',
-  steps: '#2563eb',
-  sleep: '#7c3aed',
-  calories: '#ea580c',
+interface ChartTokens {
+  /** Horizontal grid lines. */
+  grid: string;
+  /** Axis tick lines. */
+  axis: string;
+  /** Axis tick labels. */
+  tick: string;
+  /** Dotted goal reference line. */
+  guide: string;
+}
+
+/** Per-theme metric colours, tuned to contrast with each surface. */
+const METRIC_COLORS: Record<ThemeMode, Record<MetricKey, string>> = {
+  light: { weight: '#0f766e', steps: '#2563eb', sleep: '#7c3aed', calories: '#ea580c' },
+  dark: { weight: '#2dd4bf', steps: '#60a5fa', sleep: '#a78bfa', calories: '#fb923c' },
+};
+
+const AXIS_TOKENS: Record<ThemeMode, ChartTokens> = {
+  light: { grid: '#e2e8f0', axis: '#cbd5e1', tick: '#64748b', guide: '#94a3b8' },
+  dark: { grid: '#243049', axis: '#334155', tick: '#94a3b8', guide: '#64748b' },
 };
 
 interface TooltipEntry {
@@ -91,10 +108,13 @@ function TimeSeriesChartBase({
   goal,
   goalLabel,
   height = 260,
-  color = DEFAULT_COLORS[metric],
+  theme = 'light',
+  color,
 }: TimeSeriesChartProps) {
   const unit = METRIC_UNITS[metric];
   const { value: valueKey, average: averageKey } = CHART_KEYS[metric];
+  const tokens = AXIS_TOKENS[theme];
+  const seriesColor = color ?? METRIC_COLORS[theme][metric];
 
   const values = useMemo(() => metricValues(data, metric), [data, metric]);
   // The goal is passed as an anchor so its reference line stays on the chart.
@@ -137,17 +157,17 @@ function TimeSeriesChartBase({
         <div style={{ height }} className="chart-card__canvas">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: -12 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={tokens.grid} vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 12, fill: '#64748b' }}
+                tick={{ fontSize: 12, fill: tokens.tick }}
                 minTickGap={24}
-                stroke="#cbd5e1"
+                stroke={tokens.axis}
               />
               <YAxis
                 domain={domain}
-                tick={{ fontSize: 12, fill: '#64748b' }}
-                stroke="#cbd5e1"
+                tick={{ fontSize: 12, fill: tokens.tick }}
+                stroke={tokens.axis}
                 width={56}
                 tickFormatter={(value: number) => formatNumber(value, digits)}
               />
@@ -165,16 +185,16 @@ function TimeSeriesChartBase({
               {goal !== undefined ? (
                 <ReferenceLine
                   y={goal}
-                  stroke="#94a3b8"
+                  stroke={tokens.guide}
                   strokeDasharray="4 4"
-                  label={{ value: goalLabel, position: 'insideTopRight', fontSize: 11, fill: '#64748b' }}
+                  label={{ value: goalLabel, position: 'insideTopRight', fontSize: 11, fill: tokens.tick }}
                 />
               ) : null}
               <Line
                 type="monotone"
                 dataKey={averageKey}
                 name="average"
-                stroke={color}
+                stroke={seriesColor}
                 strokeWidth={2.5}
                 dot={false}
                 connectNulls
@@ -184,10 +204,10 @@ function TimeSeriesChartBase({
                 type="monotone"
                 dataKey={valueKey}
                 name="value"
-                stroke={color}
+                stroke={seriesColor}
                 strokeWidth={1.5}
                 strokeOpacity={0.45}
-                dot={{ r: 2, fill: color, strokeWidth: 0 }}
+                dot={{ r: 2, fill: seriesColor, strokeWidth: 0 }}
                 activeDot={{ r: 4 }}
                 connectNulls={false}
                 isAnimationActive={false}

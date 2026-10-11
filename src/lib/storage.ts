@@ -12,12 +12,13 @@
 import { isValidISODate } from './date.ts';
 import { mergeEntries, sortEntries } from './series.ts';
 import { METRIC_RANGES } from '../types.ts';
-import type { DailyEntry, Profile } from '../types.ts';
+import type { DailyEntry, Profile, ThemeMode } from '../types.ts';
 
 export const STORAGE_KEYS = {
   entries: 'health-tracker:entries',
   profile: 'health-tracker:profile',
   version: 'health-tracker:version',
+  theme: 'health-tracker:theme',
 } as const;
 
 /** Bump when the persisted shape changes incompatibly. */
@@ -185,6 +186,18 @@ export function saveEntries(storage: StorageLike, entries: readonly DailyEntry[]
 
 export function saveProfile(storage: StorageLike, profile: Profile): void {
   storage.setItem(STORAGE_KEYS.profile, JSON.stringify(profile));
+}
+
+const THEME_MODES: readonly ThemeMode[] = ['light', 'dark'];
+
+/** Reads the persisted theme; `null` when absent or not a known value. */
+export function loadTheme(storage: StorageLike): ThemeMode | null {
+  const raw = storage.getItem(STORAGE_KEYS.theme);
+  return (THEME_MODES as readonly string[]).includes(raw ?? '') ? (raw as ThemeMode) : null;
+}
+
+export function saveTheme(storage: StorageLike, theme: ThemeMode): void {
+  storage.setItem(STORAGE_KEYS.theme, theme);
 }
 
 export function clearState(storage: StorageLike): void {

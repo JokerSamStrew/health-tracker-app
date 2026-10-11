@@ -5,8 +5,10 @@ import { HistoryTable } from './components/HistoryTable.tsx';
 import { InsightsPanel } from './components/InsightsPanel.tsx';
 import { ProfilePanel } from './components/ProfilePanel.tsx';
 import { SummaryCards } from './components/SummaryCards.tsx';
+import { ThemeToggle } from './components/ThemeToggle.tsx';
 import { TimeSeriesChart } from './components/TimeSeriesChart.tsx';
 import { useHealthData } from './hooks/useHealthData.ts';
+import { useTheme } from './hooks/useTheme.ts';
 import { buildChartData } from './lib/charts.ts';
 import { formatShortDate } from './lib/date.ts';
 import { DEFAULT_WINDOW_DAYS } from './lib/insights.ts';
@@ -50,6 +52,7 @@ function generateDemoData(days: number, endDate: string): DailyEntry[] {
 export default function App() {
   const [windowDays, setWindowDays] = useState<number>(DEFAULT_WINDOW_DAYS);
   const [editingEntry, setEditingEntry] = useState<DailyEntry | null>(null);
+  const { theme, toggleTheme } = useTheme();
   const {
     entries,
     profile,
@@ -92,6 +95,7 @@ export default function App() {
         </div>
 
         <div className="app__header-actions">
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
           <label className="field field--inline">
             <span>Window</span>
             <select
@@ -141,6 +145,7 @@ export default function App() {
               summary={report.summaries.weight}
               goal={profile.targetWeightKg}
               goalLabel="Target"
+              theme={theme}
             />
             <TimeSeriesChart
               title="Steps"
@@ -149,6 +154,7 @@ export default function App() {
               summary={report.summaries.steps}
               goal={profile.dailyStepGoal}
               goalLabel="Step goal"
+              theme={theme}
             />
             <TimeSeriesChart
               title="Sleep"
@@ -157,6 +163,7 @@ export default function App() {
               summary={report.summaries.sleep}
               goal={profile.sleepGoalQuality}
               goalLabel="Sleep goal"
+              theme={theme}
             />
             <TimeSeriesChart
               title="Calories eaten"
@@ -165,6 +172,7 @@ export default function App() {
               summary={report.summaries.calories}
               goal={profile.dailyCalorieGoal}
               goalLabel="Calorie goal"
+              theme={theme}
             />
           </div>
         </section>

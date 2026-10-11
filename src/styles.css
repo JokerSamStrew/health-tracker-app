@@ -4,6 +4,8 @@
    -------------------------------------------------------------------------- */
 
 :root {
+  color-scheme: light;
+
   --bg: #f1f5f9;
   --surface: #ffffff;
   --surface-muted: #f8fafc;
@@ -14,6 +16,7 @@
   --text-faint: #94a3b8;
 
   --accent: #0f766e;
+  --accent-hover: #115e59;
   --accent-soft: #ccfbf1;
   --blue: #2563eb;
   --purple: #7c3aed;
@@ -28,6 +31,18 @@
   --positive: #15803d;
   --positive-soft: #dcfce7;
 
+  /* Text sitting on top of a solid accent/severity fill. */
+  --on-accent: #ffffff;
+  --on-critical: #ffffff;
+  --on-warning: #ffffff;
+  --on-info: #ffffff;
+  --on-positive: #ffffff;
+
+  /* Soft border tints for banners and badges. */
+  --warning-border: #fde68a;
+  --critical-border: #fca5a5;
+  --positive-border: #bbf7d0;
+
   --radius: 12px;
   --radius-sm: 8px;
   --shadow: 0 1px 2px rgb(15 23 42 / 6%), 0 4px 12px rgb(15 23 42 / 4%);
@@ -35,6 +50,51 @@
 
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+}
+
+/* Dark theme: same token names, darker surfaces and lighter text. `useTheme`
+   keeps the `data-theme` attribute on <html>; the inline script in index.html
+   sets it before first paint so there is no flash. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0b1220;
+  --surface: #131c30;
+  --surface-muted: #1a2540;
+  --border: #243049;
+  --border-strong: #334155;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-soft: rgb(45 212 191 / 14%);
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+  --orange: #fb923c;
+
+  --critical: #f87171;
+  --critical-soft: rgb(248 113 113 / 14%);
+  --warning: #fbbf24;
+  --warning-soft: rgb(251 191 36 / 14%);
+  --info: #60a5fa;
+  --info-soft: rgb(96 165 250 / 14%);
+  --positive: #4ade80;
+  --positive-soft: rgb(74 222 128 / 14%);
+
+  --on-accent: #042f2e;
+  --on-critical: #450a0a;
+  --on-warning: #451a03;
+  --on-info: #172554;
+  --on-positive: #052e16;
+
+  --warning-border: rgb(251 191 36 / 45%);
+  --critical-border: rgb(248 113 113 / 50%);
+  --positive-border: rgb(74 222 128 / 45%);
+
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 12px rgb(0 0 0 / 35%);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 45%);
 }
 
 *,
@@ -128,7 +188,7 @@ code {
   height: 44px;
   border-radius: var(--radius);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 1.4rem;
   font-weight: 700;
 }
@@ -220,7 +280,7 @@ code {
 .banner--warning {
   background: var(--warning-soft);
   color: var(--warning);
-  border: 1px solid #fde68a;
+  border: 1px solid var(--warning-border);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -249,11 +309,11 @@ input:focus-visible {
 
 .button--primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .button--primary:hover {
-  background: #115e59;
+  background: var(--accent-hover);
 }
 
 .button--ghost {
@@ -267,9 +327,21 @@ input:focus-visible {
   color: var(--text);
 }
 
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
 .button--danger {
   background: transparent;
-  border-color: #fca5a5;
+  border-color: var(--critical-border);
   color: var(--critical);
   padding: 4px 10px;
   font-size: 0.8125rem;
@@ -316,7 +388,7 @@ input:focus-visible {
 
 .field input[aria-invalid='true'] {
   border-color: var(--critical);
-  background: #fff5f5;
+  background: var(--critical-soft);
 }
 
 .field__error {
@@ -576,6 +648,23 @@ input:focus-visible {
   margin-top: 2px;
 }
 
+/* The light tooltip is a dark pill; on a dark surface it needs to invert so
+   it stays the high-contrast element over the chart. */
+:root[data-theme='dark'] .chart-tooltip {
+  background: var(--surface-muted);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+
+:root[data-theme='dark'] .chart-tooltip__date,
+:root[data-theme='dark'] .chart-tooltip strong {
+  color: var(--text);
+}
+
+:root[data-theme='dark'] .chart-tooltip__goal {
+  border-top-color: var(--border);
+}
+
 /* -------------------------------------------------------------------------- */
 /* insights                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -605,7 +694,7 @@ input:focus-visible {
 
 .insights__count--positive {
   background: var(--positive-soft);
-  border-color: #bbf7d0;
+  border-color: var(--positive-border);
   color: var(--positive);
 }
 
@@ -680,13 +769,13 @@ input:focus-visible {
 }
 
 .insight__badge--critical { background: var(--critical-soft); color: var(--critical); }
-.insight__badge--critical > span { background: var(--critical); color: #fff; }
+.insight__badge--critical > span { background: var(--critical); color: var(--on-critical); }
 .insight__badge--warning { background: var(--warning-soft); color: var(--warning); }
-.insight__badge--warning > span { background: var(--warning); color: #fff; }
+.insight__badge--warning > span { background: var(--warning); color: var(--on-warning); }
 .insight__badge--info { background: var(--info-soft); color: var(--info); }
-.insight__badge--info > span { background: var(--info); color: #fff; }
+.insight__badge--info > span { background: var(--info); color: var(--on-info); }
 .insight__badge--positive { background: var(--positive-soft); color: var(--positive); }
-.insight__badge--positive > span { background: var(--positive); color: #fff; }
+.insight__badge--positive > span { background: var(--positive); color: var(--on-positive); }
 
 .insight__summary {
   font-size: 0.875rem;
@@ -1028,12 +1117,16 @@ input:focus-visible {
 
 .button--danger:not(:only-child) {
   background: var(--critical);
-  color: #fff;
+  color: var(--on-critical);
   border-color: var(--critical);
 }
 
 .button--danger:not(:only-child):hover {
   background: #991b1b;
+}
+
+:root[data-theme='dark'] .button--danger:not(:only-child):hover {
+  background: #ef4444;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1063,7 +1156,7 @@ input:focus-visible {
   gap: 10px;
   padding: 12px;
   background: var(--warning-soft);
-  border: 1px solid #fde68a;
+  border: 1px solid var(--warning-border);
   border-radius: var(--radius-sm);
 }
 

@@ -27,6 +27,9 @@ activity level, goals) unlocks the energy-balance and goal-tracking analysis.
 - **Health score** — 0–100, derived from the severity of the findings.
 - **JSON backup** — export everything (entries + profile) to a `.json` file and
   restore it later; importing replaces the current data after confirmation.
+- **Dark theme** — light and dark themes, chosen by a header toggle, remembered
+  across reloads, and pre-applied before first paint to avoid a flash. The OS
+  color scheme is the default until you pick one.
 - **Sample data** — one click seeds 90 deterministic days so the app can be
   explored without typing anything.
 
@@ -127,7 +130,7 @@ balance, calorie stability, and intake-vs-weight agreement.
 pnpm test
 ```
 
-374 tests across 10 files, mirroring the `lib/` modules one-to-one, plus component
+385 tests across 11 files, mirroring the `lib/` modules one-to-one, plus component
 and hook tests. Notable techniques:
 
 - Determinism: tests always pass an explicit `referenceDate`, so no assertion
