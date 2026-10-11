@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { EntryForm } from './components/EntryForm.tsx';
+import { BackupPanel } from './components/BackupPanel.tsx';
 import { HistoryTable } from './components/HistoryTable.tsx';
 import { InsightsPanel } from './components/InsightsPanel.tsx';
 import { ProfilePanel } from './components/ProfilePanel.tsx';
@@ -47,7 +48,7 @@ function generateDemoData(days: number, endDate: string): DailyEntry[] {
 
 export default function App() {
   const [windowDays, setWindowDays] = useState<number>(DEFAULT_WINDOW_DAYS);
-  const { entries, profile, report, upsertEntry, removeEntry, updateProfile, clearAll, recovered } =
+  const { entries, profile, report, upsertEntry, removeEntry, updateProfile, importData, clearAll, recovered } =
     useHealthData({ windowDays });
 
   const today = report.referenceDate;
@@ -169,6 +170,12 @@ export default function App() {
               latestWeightKg={latestWeight}
               onChange={updateProfile}
               onClearAll={clearAll}
+            />
+            <BackupPanel
+              entries={entries}
+              profile={profile}
+              referenceDate={today}
+              onImport={importData}
             />
           </div>
         </div>

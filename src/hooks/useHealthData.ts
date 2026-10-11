@@ -21,6 +21,8 @@ export interface UseHealthData {
   upsertEntry: (entry: DailyEntry) => void;
   removeEntry: (date: string) => void;
   updateProfile: (patch: Profile) => void;
+  /** Replaces all current entries and profile with an imported backup. */
+  importData: (entries: DailyEntry[], profile: Profile) => void;
   clearAll: () => void;
   /** True when persisted data had to be discarded on load. */
   recovered: boolean;
@@ -66,6 +68,15 @@ export function useHealthData(
     setProfile((current) => ({ ...current, ...patch }));
   }, []);
 
+  // Import is a full replace (the UI confirms before calling this). The
+  // backup's profile is merged over the defaults so goals always resolve,
+  // mirroring how state is initialized from storage.
+  const importData = useCallback((importedEntries: DailyEntry[], importedProfile: Profile) => {
+    setEntries(sortEntries(importedEntries));
+    setProfile({ ...DEFAULT_PROFILE, ...importedProfile });
+    setRecovered(false);
+  }, []);
+
   const clearAll = useCallback(() => {
     clearState(storage);
     setEntries([]);
@@ -85,6 +96,7 @@ export function useHealthData(
     upsertEntry,
     removeEntry,
     updateProfile,
+    importData,
     clearAll,
     recovered,
   };

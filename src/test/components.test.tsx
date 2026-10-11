@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { BackupPanel } from '../components/BackupPanel.tsx';
 import { EntryForm, formToEntry } from '../components/EntryForm.tsx';
 import { HistoryTable } from '../components/HistoryTable.tsx';
 import { InsightsPanel } from '../components/InsightsPanel.tsx';
@@ -13,6 +14,16 @@ import { DEFAULT_PROFILE } from '../types.ts';
 import type { DailyEntry, Insight, Profile } from '../types.ts';
 
 const REFERENCE = '2024-03-14';
+
+// jsdom's Blob lacks `text()`, so read blobs through FileReader instead.
+function blobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
+}
 
 function makeEntries(days: number, endDate = REFERENCE): DailyEntry[] {
   const entries: DailyEntry[] = [];
@@ -268,6 +279,118 @@ describe('HistoryTable', () => {
   it('shows an empty state', () => {
     render(<HistoryTable entries={[]} onDelete={vi.fn()} />);
     expect(screen.getByText(/no entries yet/i)).toBeInTheDocument();
+  });
+});
+
+describe('BackupPanel', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('downloads a JSON backup on export', async () => {
+    const user = userEvent.setup();
+    let exportedBlob: Blob | null = null;
+    const createObjectURL = vi.fn((blob: Blob) => {
+      exportedBlob = blob;
+      return 'blob:mock';
+    });
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL: vi.fn() });
+    const downloads: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloads.push(this.download);
+    });
+
+    render(
+      <BackupPanel
+        entries={makeEntries(2)}
+        profile={{ age: 30 }}
+        referenceDate={REFERENCE}
+        onImport={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /export all data/i }));
+
+    expect(downloads).toEqual([`health-tracker-backup-${REFERENCE}.json`]);
+    const payload = JSON.parse(await blobText(exportedBlob!)) as {
+      format: string;
+      version: number;
+      entries: DailyEntry[];
+      profile: Profile;
+    };
+    expect(payload.format).toBe('health-tracker');
+    expect(payload.version).toBe(1);
+    expect(payload.entries).toHaveLength(2);
+    expect(payload.profile).toEqual({ age: 30 });
+    expect(screen.getByRole('status')).toHaveTextContent(/exported 2 entries/i);
+  });
+
+  it('confirms before importing a backup, then hands it to the parent', async () => {
+    const user = userEvent.setup();
+    const onImport = vi.fn();
+    render(
+      <BackupPanel entries={[]} profile={{}} referenceDate={REFERENCE} onImport={onImport} />,
+    );
+
+    const backup = JSON.stringify({
+      format: 'health-tracker',
+      version: 1,
+      exportedAt: '2024-03-14T12:00:00.000Z',
+      entries: [{ date: '2024-03-10', steps: 9000, weightKg: 80.5 }],
+      profile: { age: 30 },
+    });
+    const file = new File([backup], 'backup.json', { type: 'application/json' });
+    await user.upload(screen.getByLabelText(/backup file/i), file);
+
+    // The destructive step needs a click before the data is applied.
+    await user.click(await screen.findByRole('button', { name: /replace with this file/i }));
+    await waitFor(() => {
+      expect(onImport).toHaveBeenCalledWith(
+        [{ date: '2024-03-10', steps: 9000, weightKg: 80.5 }],
+        { age: 30 },
+      );
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent(/imported 1 entries/i);
+  });
+
+  it('cancelling an import applies nothing', async () => {
+    const user = userEvent.setup();
+    const onImport = vi.fn();
+    render(
+      <BackupPanel entries={[]} profile={{}} referenceDate={REFERENCE} onImport={onImport} />,
+    );
+
+    const backup = JSON.stringify({
+      format: 'health-tracker',
+      version: 1,
+      exportedAt: '2024-03-14T12:00:00.000Z',
+      entries: [{ date: '2024-03-10', steps: 9000 }],
+    });
+    await user.upload(screen.getByLabelText(/backup file/i), new File([backup], 'b.json'));
+    await user.click(await screen.findByRole('button', { name: /cancel/i }));
+
+    expect(onImport).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /replace with this file/i })).not.toBeInTheDocument();
+  });
+
+  it('rejects a file that is not a backup', async () => {
+    const user = userEvent.setup();
+    const onImport = vi.fn();
+    render(
+      <BackupPanel entries={[]} profile={{}} referenceDate={REFERENCE} onImport={onImport} />,
+    );
+
+    await user.upload(
+      screen.getByLabelText(/backup file/i),
+      new File(['{ not json'], 'typo.json', { type: 'application/json' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /not a valid health tracker backup/i,
+    );
+    expect(onImport).not.toHaveBeenCalled();
   });
 });
 

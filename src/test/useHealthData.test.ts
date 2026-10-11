@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useHealthData } from '../hooks/useHealthData.ts';
 import { createMemoryStorage, STORAGE_KEYS } from '../lib/storage.ts';
+import { DEFAULT_PROFILE } from '../types.ts';
 import type { Profile } from '../types.ts';
 
 const REFERENCE = '2024-03-14';
@@ -207,6 +208,48 @@ describe('useHealthData', () => {
 
     expect(result.current.entries).toEqual([]);
     expect(result.current.profile.heightCm).toBe(180);
+  });
+
+  it('replaces entries and profile on import', () => {
+    const { result } = setup({ heightCm: 180 });
+    act(() => {
+      result.current.upsertEntry({ date: '2024-03-10', steps: 9000 });
+      result.current.upsertEntry({ date: '2024-03-11', steps: 9500 });
+    });
+
+    act(() => {
+      result.current.importData([{ date: '2024-03-01', steps: 3000, weightKg: 79 }], {
+        age: 40,
+        sex: 'female',
+      });
+    });
+
+    // Nothing from before the import survives.
+    expect(result.current.entries).toEqual([{ date: '2024-03-01', steps: 3000, weightKg: 79 }]);
+    expect(result.current.profile).toEqual({ ...DEFAULT_PROFILE, age: 40, sex: 'female' });
+    expect(result.current.profile.heightCm).toBeUndefined();
+  });
+
+  it('persists imported data to storage', () => {
+    const { result, storage } = setup();
+    act(() => {
+      result.current.importData([{ date: REFERENCE, steps: 7000 }], { age: 30 });
+    });
+
+    expect(storage.getItem(STORAGE_KEYS.entries)).toContain(REFERENCE);
+    expect(storage.getItem(STORAGE_KEYS.profile)).toContain('30');
+  });
+
+  it('clears the recovered flag after a successful import', () => {
+    const storage = createMemoryStorage({ [STORAGE_KEYS.entries]: 'not json' });
+    const { result } = renderHook(() => useHealthData({ referenceDate: REFERENCE }, storage));
+    expect(result.current.recovered).toBe(true);
+
+    act(() => {
+      result.current.importData([{ date: REFERENCE, steps: 100 }], {});
+    });
+
+    expect(result.current.recovered).toBe(false);
   });
 
   it('writes to storage only when the data actually changes', () => {

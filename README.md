@@ -22,6 +22,8 @@ goals) unlocks the energy-balance and goal-tracking analysis.
 - **Cross-metric analysis** — e.g. short sleep alongside a rising weight, or
   logged calories that do not explain the weight change you are seeing.
 - **Health score** — 0–100, derived from the severity of the findings.
+- **JSON backup** — export everything (entries + profile) to a `.json` file and
+  restore it later; importing replaces the current data after confirmation.
 - **Sample data** — one click seeds 90 deterministic days so the app can be
   explored without typing anything.
 
@@ -72,6 +74,7 @@ src/
     insights.ts          The rule engine: analyzeHealth() + THRESHOLDS
     charts.ts            Recharts-shaped data, gaps as null, axis domains
     storage.ts           localStorage read/write with defensive sanitizing
+    backup.ts            JSON export/import envelope for entries + profile
   hooks/
     useHealthData.ts     State + persistence + report memo
   components/            Presentational React components
@@ -105,10 +108,15 @@ balance, calorie stability, and intake-vs-weight agreement.
 
 - Everything is stored in this browser's `localStorage` under the
   `health-tracker:*` keys. Nothing is uploaded anywhere.
+- **Backup** — use "Export all data (.json)" to download everything you have
+  logged (entries + profile) as a single JSON file. "Import from file" restores
+  one: it replaces the current data, which is confirmed before anything
+  changes. This is the only way to move data between devices or browsers.
 - Clearing site data, or using "Delete all data" in the app, erases the history.
-  There is no backup and no sync.
-- Corrupt or hand-edited storage is never fatal: unreadable data is discarded,
-  the app starts empty, and a banner explains what happened.
+  There is no sync.
+- Corrupt or hand-edited storage, or a malformed backup file, is never fatal:
+  unreadable data is discarded, the app starts empty, and a banner explains
+  what happened.
 
 ## Testing
 
@@ -116,7 +124,7 @@ balance, calorie stability, and intake-vs-weight agreement.
 pnpm test
 ```
 
-333 tests across 9 files, mirroring the `lib/` modules one-to-one, plus component
+350 tests across 10 files, mirroring the `lib/` modules one-to-one, plus component
 and hook tests. Notable techniques:
 
 - Determinism: tests always pass an explicit `referenceDate`, so no assertion

@@ -67,6 +67,7 @@ src/lib/series.ts   Entries -> sorted/merged series + per-metric summaries.
 src/lib/insights.ts analyzeHealth() and the 14 rules. THRESHOLDS lives here.
 src/lib/charts.ts   Recharts-shaped points, null gaps, padded axis domains.
 src/lib/storage.ts  localStorage read/write, sanitizing, memory fake.
+src/lib/backup.ts   JSON export/import envelope for entries + profile.
 src/hooks/          useHealthData: state + persistence + memoized report.
 src/components/     Presentational React only; props in, no store access.
 ```
