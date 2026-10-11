@@ -780,6 +780,57 @@ input:focus-visible {
   color: var(--text-faint);
 }
 
+.entry-form__tags {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.entry-form__tags-title {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+.entry-form__tags-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.entry-form__tags-group-name {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  margin-right: 2px;
+}
+
+.entry-form__chip {
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.entry-form__chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.entry-form__chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .entry-form__status {
   font-size: 0.8125rem;
   color: var(--positive);

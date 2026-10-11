@@ -20,6 +20,42 @@ export type EntryPeriod = 'day' | 'range';
 /** Safety cap so one save cannot grow past a year of entries. */
 const MAX_RANGE_DAYS = 366;
 
+/** Cap for the note field, mirrored in the `maxLength` attribute. */
+const MAX_NOTE_LENGTH = 400;
+
+export interface QuickTagGroup {
+  /** Short label shown above a group of tags. */
+  name: string;
+  tags: string[];
+}
+
+/**
+ * Clickable mood phrases; each click appends a tag to the note field,
+ * separated by commas. Grouped by the Simple / Detailed / Energy sets.
+ */
+export const QUICK_TAG_GROUPS: QuickTagGroup[] = [
+  {
+    name: 'Simple',
+    tags: ['Happy', 'Sad', 'Anxious', 'Angry', 'Neutral'],
+  },
+  {
+    name: 'Detailed',
+    tags: [
+      'Joyful', 'Content',
+      'Lonely', 'Isolated',
+      'Overwhelmed', 'Stressed',
+      'Irritable', 'Frustrated',
+      'Calm', 'Peaceful',
+      'Exhausted', 'Burned out',
+      'Bored', 'Apathetic',
+    ],
+  },
+  {
+    name: 'Energy',
+    tags: ['High Energy', 'Balanced', 'Low Energy'],
+  },
+];
+
 interface FormState {
   period: EntryPeriod;
   /** `YYYY-MM-DD`, used when `period` is 'day'. */
@@ -196,6 +232,29 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
       const next = { ...current };
       delete next[field];
       return next;
+    });
+  }
+
+  /** Appends a quick tag to the note, comma-separated; skips duplicates. */
+  function appendTag(tag: string): void {
+    setSaved(false);
+    setErrors((current) => {
+      if (!current.note) return current;
+      const next = { ...current };
+      delete next.note;
+      return next;
+    });
+    setForm((current) => {
+      const parts = current.note
+        .split(',')
+        .map((part) => part.trim())
+        .filter((part) => part !== '')
+        .map((part) => part.toLowerCase());
+      if (parts.includes(tag.toLowerCase())) return current;
+      const existing = current.note.trim();
+      const next = existing === '' ? tag : `${existing}, ${tag}`;
+      if (next.length > MAX_NOTE_LENGTH) return current;
+      return { ...current, note: next };
     });
   }
 
@@ -395,7 +454,7 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
           <span>Note (optional)</span>
           <input
             type="text"
-            maxLength={400}
+            maxLength={MAX_NOTE_LENGTH}
             placeholder="Long run, felt great"
             value={form.note}
             onChange={(event) => update('note', event.target.value)}
@@ -408,6 +467,27 @@ export function EntryForm({ defaultDate, onSave }: EntryFormProps) {
             </small>
           ) : null}
         </label>
+      </div>
+
+      <div className="entry-form__tags" role="group" aria-label="Quick tags">
+        <p className="entry-form__tags-title">
+          Quick tags — click to add to the note, separated by commas
+        </p>
+        {QUICK_TAG_GROUPS.map((group) => (
+          <div className="entry-form__tags-group" key={group.name}>
+            <span className="entry-form__tags-group-name">{group.name}</span>
+            {group.tags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className="entry-form__chip"
+                onClick={() => appendTag(tag)}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        ))}
       </div>
 
       <div className="entry-form__actions">

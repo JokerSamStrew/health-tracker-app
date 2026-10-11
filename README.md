@@ -127,7 +127,7 @@ balance, calorie stability, and intake-vs-weight agreement.
 pnpm test
 ```
 
-360 tests across 10 files, mirroring the `lib/` modules one-to-one, plus component
+363 tests across 10 files, mirroring the `lib/` modules one-to-one, plus component
 and hook tests. Notable techniques:
 
 - Determinism: tests always pass an explicit `referenceDate`, so no assertion

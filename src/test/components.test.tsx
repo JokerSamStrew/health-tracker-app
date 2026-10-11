@@ -234,6 +234,38 @@ describe('EntryForm', () => {
     expect(screen.getByLabelText('Start')).toBeInTheDocument();
     expect(steps).toHaveValue(null);
   });
+
+  it('adds quick tags to the note, comma-separated', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+
+    await user.click(screen.getByRole('button', { name: 'Happy' }));
+    await user.click(screen.getByRole('button', { name: 'Anxious' }));
+    expect(screen.getByLabelText(/note/i)).toHaveValue('Happy, Anxious');
+
+    // Tags alone satisfy the "at least one measurement" rule.
+    await user.click(screen.getByRole('button', { name: /save entry/i }));
+    expect(onSave).toHaveBeenCalledWith({ date: REFERENCE, note: 'Happy, Anxious' });
+  });
+
+  it('appends tags to a note that already has text', async () => {
+    const user = userEvent.setup();
+    render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/note/i), 'Long run');
+    await user.click(screen.getByRole('button', { name: 'Calm or Peaceful' }));
+    expect(screen.getByLabelText(/note/i)).toHaveValue('Long run, Calm or Peaceful');
+  });
+
+  it('does not duplicate a quick tag already in the note', async () => {
+    const user = userEvent.setup();
+    render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Sad' }));
+    await user.click(screen.getByRole('button', { name: 'Sad' }));
+    expect(screen.getByLabelText(/note/i)).toHaveValue('Sad');
+  });
 });
 
 describe('formToEntry', () => {
