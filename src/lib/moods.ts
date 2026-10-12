@@ -19,33 +19,96 @@ export const MAX_MOOD_TAG_LENGTH = 40;
 export const MAX_MOOD_TAGS = 20;
 
 export interface MoodTagGroup {
-  /** Short label shown above a group of tags. */
-  name: string;
-  tags: string[];
+    /** Short label shown above a group of tags. */
+    name: string;
+    tags: string[];
 }
 
 /** The palette the form offers, grouped so a long list stays scannable. */
 export const MOOD_TAG_GROUPS: MoodTagGroup[] = [
-  {
-    name: 'Simple',
-    tags: ['Happy', 'Sad', 'Anxious', 'Angry', 'Neutral'],
-  },
-  {
-    name: 'Detailed',
-    tags: [
-      'Joyful', 'Content',
-      'Lonely', 'Isolated',
-      'Overwhelmed', 'Stressed',
-      'Irritable', 'Frustrated',
-      'Calm', 'Peaceful',
-      'Exhausted', 'Burned out',
-      'Bored', 'Apathetic',
-    ],
-  },
-  {
-    name: 'Energy',
-    tags: ['High Energy', 'Balanced', 'Low Energy'],
-  },
+    {
+        name: 'Simple',
+        tags: ['Happy', 'Sad', 'Anxious', 'Angry', 'Neutral'],
+    },
+    {
+        name: 'Detailed',
+        tags: [
+            'Amused',
+            'Apathetic',
+            'Bored',
+            'Burned out',
+            'Calm',
+            'Comfortable',
+            'Compassionate',
+            'Confident',
+            'Confused',
+            'Connected',
+            'Content',
+            'Contented',
+            'Curious',
+            'Determined',
+            'Disappointed',
+            'Disheartened',
+            'Distracted',
+            'Drained',
+            'Embarrassed',
+            'Empty',
+            'Excited',
+            'Exhausted',
+            'Fearful',
+            'Focused',
+            'Frustrated',
+            'Grateful',
+            'Guilty',
+            'Hopeful',
+            'Hurt',
+            'Impatient',
+            'Indifferent',
+            'Insecure',
+            'Inspired',
+            'Irritable',
+            'Isolated',
+            'Jealous',
+            'Joyful',
+            'Lethargic',
+            'Lonely',
+            'Loving',
+            'Melancholy',
+            'Mixed',
+            'Motivated',
+            'Nostalgic',
+            'Numb',
+            'Optimistic',
+            'Overstimulated',
+            'Overwhelmed',
+            'Peaceful',
+            'Playful',
+            'Productive',
+            'Proud',
+            'Reflective',
+            'Regretful',
+            'Relaxed',
+            'Resentful',
+            'Rested',
+            'Restless',
+            'Serene',
+            'Social',
+            'Stressed',
+            'Surprised',
+            'Tense',
+            'Thoughtful',
+            'Uncertain',
+            'Unmotivated',
+            'Unsettled',
+            'Vulnerable',
+            'Withdrawn',
+            'Worried',
+        ],
+    },
+    {
+        name: 'Energy',
+        tags: ['High Energy', 'Balanced', 'Low Energy'],
+    },
 ];
 
 /** Every offered tag, flattened, in the order the groups declare them. */
@@ -53,10 +116,10 @@ export const MOOD_TAGS: string[] = MOOD_TAG_GROUPS.flatMap((group) => group.tags
 
 /** Trims and collapses whitespace, then caps the length. `null` when empty. */
 export function normalizeMoodTag(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const trimmed = raw.trim().replace(/\s+/g, ' ');
-  if (trimmed === '') return null;
-  return trimmed.slice(0, MAX_MOOD_TAG_LENGTH);
+    if (typeof raw !== 'string') return null;
+    const trimmed = raw.trim().replace(/\s+/g, ' ');
+    if (trimmed === '') return null;
+    return trimmed.slice(0, MAX_MOOD_TAG_LENGTH);
 }
 
 /**
@@ -66,28 +129,28 @@ export function normalizeMoodTag(raw: unknown): string | null {
  * discarded.
  */
 export function normalizeMoods(value: unknown): string[] {
-  const raw =
-    typeof value === 'string' ? value.split(',') : Array.isArray(value) ? value : [];
+    const raw =
+        typeof value === 'string' ? value.split(',') : Array.isArray(value) ? value : [];
 
-  const seen = new Set<string>();
-  const moods: string[] = [];
-  for (const item of raw) {
-    const tag = normalizeMoodTag(item);
-    if (tag === null) continue;
-    const key = tag.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    moods.push(tag);
-    if (moods.length >= MAX_MOOD_TAGS) break;
-  }
-  return moods;
+    const seen = new Set<string>();
+    const moods: string[] = [];
+    for (const item of raw) {
+        const tag = normalizeMoodTag(item);
+        if (tag === null) continue;
+        const key = tag.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        moods.push(tag);
+        if (moods.length >= MAX_MOOD_TAGS) break;
+    }
+    return moods;
 }
 
 export interface MoodTagCount {
-  /** Display form of the tag, taken from the first entry that used it. */
-  tag: string;
-  /** How many logged days carried the tag inside the window. */
-  count: number;
+    /** Display form of the tag, taken from the first entry that used it. */
+    tag: string;
+    /** How many logged days carried the tag inside the window. */
+    count: number;
 }
 
 /**
@@ -97,23 +160,23 @@ export interface MoodTagCount {
  * legend are stable regardless of entry order.
  */
 export function countMoods(
-  entries: readonly DailyEntry[],
-  windowStart?: string,
-  windowEnd?: string,
+    entries: readonly DailyEntry[],
+    windowStart?: string,
+    windowEnd?: string,
 ): MoodTagCount[] {
-  const counts = new Map<string, MoodTagCount>();
-  for (const entry of entries) {
-    if (windowStart !== undefined && entry.date < windowStart) continue;
-    if (windowEnd !== undefined && entry.date > windowEnd) continue;
-    for (const tag of entry.moods ?? []) {
-      const key = tag.toLowerCase();
-      const existing = counts.get(key);
-      if (existing) existing.count += 1;
-      else counts.set(key, { tag, count: 1 });
+    const counts = new Map<string, MoodTagCount>();
+    for (const entry of entries) {
+        if (windowStart !== undefined && entry.date < windowStart) continue;
+        if (windowEnd !== undefined && entry.date > windowEnd) continue;
+        for (const tag of entry.moods ?? []) {
+            const key = tag.toLowerCase();
+            const existing = counts.get(key);
+            if (existing) existing.count += 1;
+            else counts.set(key, { tag, count: 1 });
+        }
     }
-  }
 
-  return [...counts.values()].sort(
-    (a, b) => b.count - a.count || a.tag.localeCompare(b.tag),
-  );
+    return [...counts.values()].sort(
+        (a, b) => b.count - a.count || a.tag.localeCompare(b.tag),
+    );
 }
