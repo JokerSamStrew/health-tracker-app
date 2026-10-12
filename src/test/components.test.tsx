@@ -5,12 +5,14 @@ import { BackupPanel } from '../components/BackupPanel.tsx';
 import { EntryForm, formToEntries, formToEntry } from '../components/EntryForm.tsx';
 import { HistoryTable } from '../components/HistoryTable.tsx';
 import { InsightsPanel } from '../components/InsightsPanel.tsx';
+import { MoodChart } from '../components/MoodChart.tsx';
 import { SummaryCards } from '../components/SummaryCards.tsx';
 import { ProfilePanel } from '../components/ProfilePanel.tsx';
 import { ThemeToggle } from '../components/ThemeToggle.tsx';
 import { TimeSeriesChart } from '../components/TimeSeriesChart.tsx';
 import { analyzeHealth } from '../lib/insights.ts';
 import { buildChartData } from '../lib/charts.ts';
+import { countMoods } from '../lib/moods.ts';
 import { DEFAULT_PROFILE } from '../types.ts';
 import type { DailyEntry, Insight, Profile } from '../types.ts';
 
@@ -236,36 +238,41 @@ describe('EntryForm', () => {
     expect(steps).toHaveValue(null);
   });
 
-  it('adds quick tags to the note, comma-separated', async () => {
+  it('toggles mood tags on click', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.click(screen.getByRole('button', { name: 'Happy' }));
     await user.click(screen.getByRole('button', { name: 'Anxious' }));
-    expect(screen.getByLabelText(/note/i)).toHaveValue('Happy, Anxious');
+    expect(screen.getByRole('button', { name: 'Happy' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Anxious' })).toHaveAttribute('aria-pressed', 'true');
 
     // Tags alone satisfy the "at least one measurement" rule.
     await user.click(screen.getByRole('button', { name: /save entry/i }));
-    expect(onSave).toHaveBeenCalledWith({ date: REFERENCE, note: 'Happy, Anxious' });
+    expect(onSave).toHaveBeenCalledWith({ date: REFERENCE, moods: ['Happy', 'Anxious'] });
   });
 
-  it('appends tags to a note that already has text', async () => {
+  it('removes a mood tag when it is clicked a second time', async () => {
     const user = userEvent.setup();
     render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
 
-    await user.type(screen.getByLabelText(/note/i), 'Long run');
+    const sad = screen.getByRole('button', { name: 'Sad' });
+    await user.click(sad);
+    expect(sad).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(sad);
+    expect(sad).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('keeps the mood tags selected across a period switch', async () => {
+    const user = userEvent.setup();
+    render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
+
     await user.click(screen.getByRole('button', { name: 'Calm' }));
-    expect(screen.getByLabelText(/note/i)).toHaveValue('Long run, Calm');
-  });
+    await user.selectOptions(screen.getByLabelText('Period'), 'range');
 
-  it('does not duplicate a quick tag already in the note', async () => {
-    const user = userEvent.setup();
-    render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
-
-    await user.click(screen.getByRole('button', { name: 'Sad' }));
-    await user.click(screen.getByRole('button', { name: 'Sad' }));
-    expect(screen.getByLabelText(/note/i)).toHaveValue('Sad');
+    expect(screen.getByRole('button', { name: 'Calm' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('pre-fills the form when editing an entry', () => {
@@ -278,7 +285,7 @@ describe('EntryForm', () => {
           steps: 10500,
           sleepQuality: 4,
           calories: 2400,
-          note: 'Long run',
+          moods: ['Calm'],
         }}
         onSave={vi.fn()}
         onCancelEdit={vi.fn()}
@@ -291,7 +298,7 @@ describe('EntryForm', () => {
     expect(screen.getByLabelText(/^steps/i)).toHaveValue(10500);
     expect(screen.getByLabelText(/sleep quality/i)).toHaveValue('4');
     expect(screen.getByLabelText(/calories eaten/i)).toHaveValue(2400);
-    expect(screen.getByLabelText(/note/i)).toHaveValue('Long run');
+    expect(screen.getByRole('button', { name: 'Calm' })).toHaveAttribute('aria-pressed', 'true');
     // A single entry is never edited as a range.
     expect(screen.queryByLabelText(/period/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /update entry/i })).toBeInTheDocument();
@@ -303,7 +310,7 @@ describe('EntryForm', () => {
     render(
       <EntryForm
         defaultDate={REFERENCE}
-        editingEntry={{ date: '2024-03-10', steps: 9000, note: 'Rest day' }}
+        editingEntry={{ date: '2024-03-10', steps: 9000, moods: ['Calm'] }}
         onSave={onSave}
         onCancelEdit={vi.fn()}
       />,
@@ -314,7 +321,7 @@ describe('EntryForm', () => {
 
     // Clearing a field removes it from the saved entry instead of merging over
     // the old value; the parent replaces the whole day with this result.
-    expect(onSave).toHaveBeenCalledWith({ date: '2024-03-10', note: 'Rest day' });
+    expect(onSave).toHaveBeenCalledWith({ date: '2024-03-10', moods: ['Calm'] });
   });
 
   it('leaves edit mode via Cancel without saving', async () => {
@@ -346,7 +353,7 @@ describe('formToEntry', () => {
     steps: '',
     sleepQuality: '',
     calories: '',
-    note: '',
+    moods: [],
   };
 
   it('rounds integer metrics', () => {
@@ -363,9 +370,10 @@ describe('formToEntry', () => {
     expect(formToEntry({ ...base, weightKg: '80,5' }).weightKg).toBe(80.5);
   });
 
-  it('trims the note and drops it when empty', () => {
-    expect(formToEntry({ ...base, note: '  run  ' }).note).toBe('run');
-    expect(formToEntry({ ...base, note: '   ' })).not.toHaveProperty('note');
+  it('normalises mood tags and drops them when empty', () => {
+    expect(formToEntry({ ...base, moods: ['  Calm  '] }).moods).toEqual(['Calm']);
+    expect(formToEntry({ ...base, moods: ['Calm', 'calm'] }).moods).toEqual(['Calm']);
+    expect(formToEntry({ ...base, moods: [] })).not.toHaveProperty('moods');
   });
 });
 
@@ -379,7 +387,7 @@ describe('formToEntries', () => {
     steps: '',
     sleepQuality: '',
     calories: '',
-    note: '',
+    moods: [],
   };
 
   it('returns one entry for a day', () => {
@@ -395,12 +403,12 @@ describe('formToEntries', () => {
       start: '2024-03-11',
       end: '2024-03-17',
       steps: '7000',
-      note: 'easy week',
+      moods: ['Calm'],
     });
 
     expect(entries).toHaveLength(7);
-    expect(entries[0]).toEqual({ date: '2024-03-11', steps: 7000, note: 'easy week' });
-    expect(entries[6]).toEqual({ date: '2024-03-17', steps: 7000, note: 'easy week' });
+    expect(entries[0]).toEqual({ date: '2024-03-11', steps: 7000, moods: ['Calm'] });
+    expect(entries[6]).toEqual({ date: '2024-03-17', steps: 7000, moods: ['Calm'] });
     // The values are per-day figures applied to every generated day.
     expect(new Set(entries.map((entry) => entry.steps))).toEqual(new Set([7000]));
   });
@@ -519,18 +527,18 @@ describe('HistoryTable', () => {
     expect(within(row).getAllByText('—').length).toBe(3);
   });
 
-  it('filters by note text', async () => {
+  it('filters by mood tag', async () => {
     const user = userEvent.setup();
     const entries: DailyEntry[] = [
-      { date: REFERENCE, steps: 9000, note: 'long run' },
-      { date: '2024-03-13', steps: 4000, note: 'rest day' },
+      { date: REFERENCE, steps: 9000, moods: ['High Energy'] },
+      { date: '2024-03-13', steps: 4000, moods: ['Burned out'] },
     ];
     render(<HistoryTable entries={entries} onEdit={vi.fn()} onDelete={vi.fn()} />);
 
-    await user.type(screen.getByRole('searchbox'), 'rest');
+    await user.type(screen.getByRole('searchbox'), 'burned');
 
-    expect(screen.getByText('rest day')).toBeInTheDocument();
-    expect(screen.queryByText('long run')).not.toBeInTheDocument();
+    expect(screen.getByText('Burned out')).toBeInTheDocument();
+    expect(screen.queryByText('High Energy')).not.toBeInTheDocument();
   });
 
   it('hands the clicked entry to the edit callback', async () => {
@@ -866,6 +874,74 @@ describe('TimeSeriesChart', () => {
     );
 
     expect(screen.getByText(/log sleep for at least one day/i)).toBeInTheDocument();
+    expect(container.querySelector('.recharts-wrapper')).toBeNull();
+  });
+});
+
+describe('MoodChart', () => {
+  const entries: DailyEntry[] = [
+    { date: '2024-03-12', moods: ['Happy'] },
+    { date: '2024-03-13', moods: ['Happy'] },
+    { date: '2024-03-14', moods: ['Happy', 'Calm'] },
+  ];
+  const counts = countMoods(entries, '2024-03-12', '2024-03-14');
+
+  // The pie needs the same 0x0-layout workaround as the line charts.
+  beforeAll(() => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      width: 800,
+      height: 240,
+      top: 0,
+      right: 800,
+      bottom: 240,
+      left: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private readonly callback: ResizeObserverCallback) {}
+        observe(target: Element): void {
+          const rect = { width: 800, height: 240 } as DOMRectReadOnly;
+          this.callback([{ target, contentRect: rect } as ResizeObserverEntry], this as never);
+        }
+        unobserve(): void {}
+        disconnect(): void {}
+      },
+    );
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('summarises how often each tag was logged in the window', () => {
+    render(<MoodChart counts={counts} windowStart="2024-03-12" windowEnd="2024-03-14" />);
+
+    expect(screen.getByRole('heading', { name: 'Mood tags' })).toBeInTheDocument();
+    expect(screen.getByText('Happy')).toBeInTheDocument();
+    expect(screen.getByText('Calm')).toBeInTheDocument();
+    // Happy on three days (75%), Calm on one (25%).
+    expect(screen.getByText('3 (75%)')).toBeInTheDocument();
+    expect(screen.getByText('1 (25%)')).toBeInTheDocument();
+    expect(screen.getByText(/2 tags across 4 tagged days/i)).toBeInTheDocument();
+  });
+
+  it('draws a pie when tags were logged', () => {
+    const { container } = render(
+      <MoodChart counts={counts} windowStart="2024-03-12" windowEnd="2024-03-14" />,
+    );
+    expect(container.querySelector('.recharts-pie')).not.toBeNull();
+  });
+
+  it('shows an empty state when no tags were logged', () => {
+    const { container } = render(
+      <MoodChart counts={[]} windowStart="2024-03-12" windowEnd="2024-03-14" />,
+    );
+    expect(screen.getByText(/tag your days with moods/i)).toBeInTheDocument();
     expect(container.querySelector('.recharts-wrapper')).toBeNull();
   });
 });

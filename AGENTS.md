@@ -66,6 +66,7 @@ src/lib/health.ts   BMI, BMR (Mifflin-St Jeor), TDEE, calorie target for goal.
 src/lib/series.ts   Entries -> sorted/merged series + per-metric summaries.
 src/lib/insights.ts analyzeHealth() and the 14 rules. THRESHOLDS lives here.
 src/lib/charts.ts   Recharts-shaped points, null gaps, padded axis domains.
+src/lib/moods.ts    Mood-tag catalog, normalisation, window counts.
 src/lib/storage.ts  localStorage read/write, sanitizing, memory fake.
 src/lib/backup.ts   JSON export/import envelope for entries + profile.
 src/hooks/          useHealthData: state + persistence + memoized report.
@@ -171,7 +172,7 @@ calories 0–20000.
   stages or a polysomnogram.
 - The sample-data generator is a deterministic pseudo-random walk, so its output
   is stable but is not real physiological data.
-- The production bundle is ~640 kB (194 kB gzipped), dominated by Recharts.
+- The production bundle is ~675 kB (204 kB gzipped), dominated by Recharts.
 
 ## House rules
 

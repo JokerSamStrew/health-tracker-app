@@ -67,7 +67,7 @@ function stripUndefined(entry: DailyEntry): DailyEntry {
   if (entry.steps !== undefined) result.steps = entry.steps;
   if (entry.sleepQuality !== undefined) result.sleepQuality = entry.sleepQuality;
   if (entry.calories !== undefined) result.calories = entry.calories;
-  if (entry.note !== undefined) result.note = entry.note;
+  if (entry.moods !== undefined) result.moods = [...entry.moods];
   return result;
 }
 
@@ -78,7 +78,7 @@ export function isEmptyEntry(entry: DailyEntry): boolean {
     entry.steps === undefined &&
     entry.sleepQuality === undefined &&
     entry.calories === undefined &&
-    !entry.note
+    (entry.moods?.length ?? 0) === 0
   );
 }
 

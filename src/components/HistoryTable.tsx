@@ -36,7 +36,9 @@ export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
     const needle = query.trim().toLowerCase();
     if (!needle) return sorted;
     return sorted.filter(
-      (entry) => entry.note?.toLowerCase().includes(needle) || entry.date.includes(needle),
+      (entry) =>
+        entry.date.includes(needle) ||
+        (entry.moods ?? []).some((tag) => tag.toLowerCase().includes(needle)),
     );
   }, [sorted, query]);
 
@@ -51,7 +53,7 @@ export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
           <span className="sr-only">Filter entries</span>
           <input
             type="search"
-            placeholder="Filter by date or note"
+            placeholder="Filter by date or mood"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -75,7 +77,7 @@ export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
                     {key} <span className="history__unit">({METRIC_UNITS[key]})</span>
                   </th>
                 ))}
-                <th scope="col">Note</th>
+                <th scope="col">Moods</th>
                 <th scope="col">
                   <span className="sr-only">Actions</span>
                 </th>
@@ -92,7 +94,13 @@ export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
                       {cell(entry, key)}
                     </td>
                   ))}
-                  <td className="history__note">{entry.note ?? ''}</td>
+                  <td className="history__moods">
+                    {(entry.moods ?? []).map((tag) => (
+                      <span className="history__mood" key={tag}>
+                        {tag}
+                      </span>
+                    ))}
+                  </td>
                   <td>
                     <div className="history__actions">
                       <button

@@ -3,6 +3,7 @@ import { EntryForm } from './components/EntryForm.tsx';
 import { BackupPanel } from './components/BackupPanel.tsx';
 import { HistoryTable } from './components/HistoryTable.tsx';
 import { InsightsPanel } from './components/InsightsPanel.tsx';
+import { MoodChart } from './components/MoodChart.tsx';
 import { ProfilePanel } from './components/ProfilePanel.tsx';
 import { SummaryCards } from './components/SummaryCards.tsx';
 import { ThemeToggle } from './components/ThemeToggle.tsx';
@@ -12,9 +13,13 @@ import { useTheme } from './hooks/useTheme.ts';
 import { buildChartData } from './lib/charts.ts';
 import { formatShortDate } from './lib/date.ts';
 import { DEFAULT_WINDOW_DAYS } from './lib/insights.ts';
+import { countMoods } from './lib/moods.ts';
 import type { DailyEntry } from './types.ts';
 
 const WINDOW_OPTIONS = [7, 14, 30, 90] as const;
+
+/** Mood tags the sample-data generator draws from. */
+const DEMO_MOODS = ['Happy', 'Calm', 'Anxious', 'Stressed', 'Low Energy', 'High Energy'] as const;
 
 function generateDemoData(days: number, endDate: string): DailyEntry[] {
   // Deterministic pseudo-random walk so the demo is stable across reloads.
@@ -37,13 +42,14 @@ function generateDemoData(days: number, endDate: string): DailyEntry[] {
     // Quality rating 2-5 (each integer gets a roughly equal share).
     const sleepQuality = 2 + Math.floor(rand() * 4);
     weight += (rand() - 0.55) * 0.18;
+    const mood = skip ? 'Low Energy' : DEMO_MOODS[Math.floor(rand() * DEMO_MOODS.length)]!;
     entries.push({
       date: iso,
       weightKg: Math.round(weight * 10) / 10,
       steps: Math.round(4200 + rand() * 8000),
       sleepQuality,
       calories: Math.round(1700 + rand() * 900),
-      note: skip ? 'Rest day' : undefined,
+      moods: [mood],
     });
   }
   return entries.reverse();
@@ -70,6 +76,11 @@ export default function App() {
   const chartData = useMemo(
     () => buildChartData(entries, today, Math.max(windowDays, 14)),
     [entries, today, windowDays],
+  );
+
+  const moodCounts = useMemo(
+    () => countMoods(entries, report.windowStart, report.windowEnd),
+    [entries, report.windowStart, report.windowEnd],
   );
 
   const latestWeight = report.summaries.weight.latest;
@@ -124,6 +135,13 @@ export default function App() {
         ) : null}
 
         <SummaryCards report={report} />
+
+        <MoodChart
+          counts={moodCounts}
+          windowStart={report.windowStart}
+          windowEnd={report.windowEnd}
+          theme={theme}
+        />
 
         <section className="charts" aria-label="Timelines">
           <div className="section-heading">

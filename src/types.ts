@@ -36,7 +36,11 @@ export interface DailyEntry {
   /** Subjective sleep quality on a 1-5 scale, halves allowed. */
   sleepQuality?: number;
   calories?: number;
-  note?: string;
+  /**
+   * Mood tags for the day, e.g. `['Happy', 'High Energy']`. An ordered,
+   * de-duplicated list; see `src/lib/moods.ts` for the catalog and limits.
+   */
+  moods?: string[];
 }
 
 export type Sex = 'male' | 'female';

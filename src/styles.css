@@ -606,6 +606,61 @@ input:focus-visible {
   border-radius: var(--radius-sm);
 }
 
+/* -------------------------------------------------------------------------- */
+/* mood tags                                                                  */
+/* -------------------------------------------------------------------------- */
+
+.mood-card__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+}
+
+.mood-card__pie {
+  flex: 1 1 200px;
+  min-width: 180px;
+  max-width: 300px;
+}
+
+.mood-card__legend {
+  flex: 2 1 240px;
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.mood-card__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+
+.mood-card__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.mood-card__legend-tag {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mood-card__legend-value {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .chart-tooltip {
   background: rgb(15 23 42 / 94%);
   color: #e2e8f0;
@@ -925,6 +980,20 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+.entry-form__chip--selected,
+.entry-form__chip[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.entry-form__chip--selected:hover,
+.entry-form__chip[aria-pressed='true']:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--on-accent);
+}
+
 .entry-form__status {
   font-size: 0.8125rem;
   color: var(--positive);
@@ -1032,11 +1101,19 @@ input:focus-visible {
   font-size: 0.75rem;
 }
 
-.history__note {
-  color: var(--text-muted);
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.history__moods {
+  max-width: 260px;
+}
+
+.history__mood {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.6875rem;
+  font-weight: 600;
   white-space: nowrap;
 }
 

@@ -7,6 +7,11 @@ import {
   fromISODate,
   toISODate,
 } from '../lib/date.ts';
+import {
+  MAX_MOOD_TAGS,
+  MOOD_TAG_GROUPS,
+  normalizeMoods,
+} from '../lib/moods.ts';
 import { METRIC_RANGES } from '../types.ts';
 import type { DailyEntry, MetricKey } from '../types.ts';
 
@@ -25,42 +30,6 @@ export type EntryPeriod = 'day' | 'range';
 /** Safety cap so one save cannot grow past a year of entries. */
 const MAX_RANGE_DAYS = 366;
 
-/** Cap for the note field, mirrored in the `maxLength` attribute. */
-const MAX_NOTE_LENGTH = 400;
-
-export interface QuickTagGroup {
-  /** Short label shown above a group of tags. */
-  name: string;
-  tags: string[];
-}
-
-/**
- * Clickable mood phrases; each click appends a tag to the note field,
- * separated by commas. Grouped by the Simple / Detailed / Energy sets.
- */
-export const QUICK_TAG_GROUPS: QuickTagGroup[] = [
-  {
-    name: 'Simple',
-    tags: ['Happy', 'Sad', 'Anxious', 'Angry', 'Neutral'],
-  },
-  {
-    name: 'Detailed',
-    tags: [
-      'Joyful', 'Content',
-      'Lonely', 'Isolated',
-      'Overwhelmed', 'Stressed',
-      'Irritable', 'Frustrated',
-      'Calm', 'Peaceful',
-      'Exhausted', 'Burned out',
-      'Bored', 'Apathetic',
-    ],
-  },
-  {
-    name: 'Energy',
-    tags: ['High Energy', 'Balanced', 'Low Energy'],
-  },
-];
-
 interface FormState {
   period: EntryPeriod;
   /** `YYYY-MM-DD`, used when `period` is 'day'. */
@@ -73,7 +42,8 @@ interface FormState {
   steps: string;
   sleepQuality: string;
   calories: string;
-  note: string;
+  /** Selected mood tags, in the order they were toggled on. */
+  moods: string[];
 }
 
 type FieldName = 'weightKg' | 'steps' | 'sleepQuality' | 'calories';
@@ -111,7 +81,7 @@ function emptyForm(today: string): FormState {
     steps: '',
     sleepQuality: '',
     calories: '',
-    note: '',
+    moods: [],
   };
 }
 
@@ -126,7 +96,7 @@ function formFromEntry(entry: DailyEntry): FormState {
     steps: entry.steps !== undefined ? String(entry.steps) : '',
     sleepQuality: entry.sleepQuality !== undefined ? String(entry.sleepQuality) : '',
     calories: entry.calories !== undefined ? String(entry.calories) : '',
-    note: entry.note ?? '',
+    moods: entry.moods ? [...entry.moods] : [],
   };
 }
 
@@ -141,7 +111,7 @@ function clearMeasurements(current: FormState): FormState {
     steps: '',
     sleepQuality: '',
     calories: '',
-    note: '',
+    moods: [],
   };
 }
 
@@ -185,8 +155,8 @@ function validate(form: FormState): Partial<Record<keyof FormState, string>> {
   }
 
   const hasValue = METRIC_FIELDS.some((field) => form[field].trim() !== '');
-  if (!hasValue && form.note.trim() === '') {
-    errors.note = 'Fill in at least one measurement.';
+  if (!hasValue && form.moods.length === 0) {
+    errors.moods = 'Fill in at least one measurement.';
   }
 
   return errors;
@@ -208,8 +178,8 @@ export function formToEntry(form: FormState): DailyEntry {
   const calories = parseNumber(form.calories);
   if (calories !== null) entry.calories = Math.round(calories);
 
-  const note = form.note.trim();
-  if (note !== '') entry.note = note;
+  const moods = normalizeMoods(form.moods);
+  if (moods.length > 0) entry.moods = moods;
 
   return entry;
 }
@@ -259,26 +229,23 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
     });
   }
 
-  /** Appends a quick tag to the note, comma-separated; skips duplicates. */
-  function appendTag(tag: string): void {
+  /** Adds a mood tag, or removes it when it is already selected. */
+  function toggleTag(tag: string): void {
     setSaved(false);
     setErrors((current) => {
-      if (!current.note) return current;
+      if (!current.moods) return current;
       const next = { ...current };
-      delete next.note;
+      delete next.moods;
       return next;
     });
     setForm((current) => {
-      const parts = current.note
-        .split(',')
-        .map((part) => part.trim())
-        .filter((part) => part !== '')
-        .map((part) => part.toLowerCase());
-      if (parts.includes(tag.toLowerCase())) return current;
-      const existing = current.note.trim();
-      const next = existing === '' ? tag : `${existing}, ${tag}`;
-      if (next.length > MAX_NOTE_LENGTH) return current;
-      return { ...current, note: next };
+      const key = tag.toLowerCase();
+      const exists = current.moods.some((item) => item.toLowerCase() === key);
+      if (exists) {
+        return { ...current, moods: current.moods.filter((item) => item.toLowerCase() !== key) };
+      }
+      if (current.moods.length >= MAX_MOOD_TAGS) return current;
+      return { ...current, moods: [...current.moods, tag] };
     });
   }
 
@@ -478,45 +445,39 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
         </label>
       </div>
 
-      <div className="entry-form__row">
-        <label className="field">
-          <span>Note (optional)</span>
-          <input
-            type="text"
-            maxLength={MAX_NOTE_LENGTH}
-            placeholder="Long run, felt great"
-            value={form.note}
-            onChange={(event) => update('note', event.target.value)}
-            aria-invalid={errors.note ? 'true' : undefined}
-            aria-describedby={errors.note ? 'entry-note-error' : undefined}
-          />
-          {errors.note ? (
-            <small className="field__error" id="entry-note-error">
-              {errors.note}
-            </small>
-          ) : null}
-        </label>
-      </div>
-
-      <div className="entry-form__tags" role="group" aria-label="Quick tags">
+      <div
+        className="entry-form__tags"
+        role="group"
+        aria-label="Mood tags"
+        aria-describedby={errors.moods ? 'entry-moods-error' : undefined}
+      >
         <p className="entry-form__tags-title">
-          Quick tags — click to add to the note, separated by commas
+          Mood tags — click to toggle. Selected {form.moods.length} of {MAX_MOOD_TAGS}.
         </p>
-        {QUICK_TAG_GROUPS.map((group) => (
+        {MOOD_TAG_GROUPS.map((group) => (
           <div className="entry-form__tags-group" key={group.name}>
             <span className="entry-form__tags-group-name">{group.name}</span>
-            {group.tags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                className="entry-form__chip"
-                onClick={() => appendTag(tag)}
-              >
-                {tag}
-              </button>
-            ))}
+            {group.tags.map((tag) => {
+              const selected = form.moods.some((item) => item.toLowerCase() === tag.toLowerCase());
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  className={`entry-form__chip${selected ? ' entry-form__chip--selected' : ''}`}
+                  aria-pressed={selected}
+                  onClick={() => toggleTag(tag)}
+                >
+                  {tag}
+                </button>
+              );
+            })}
           </div>
         ))}
+        {errors.moods ? (
+          <small className="field__error" id="entry-moods-error">
+            {errors.moods}
+          </small>
+        ) : null}
       </div>
 
       <div className="entry-form__actions">

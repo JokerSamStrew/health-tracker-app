@@ -92,8 +92,8 @@ describe('isEmptyEntry', () => {
     expect(isEmptyEntry({ date: '2024-03-01', weightKg: 0 })).toBe(false);
   });
 
-  it('is false when only a note is present', () => {
-    expect(isEmptyEntry({ date: '2024-03-01', note: 'sick' })).toBe(false);
+  it('is false when only mood tags are present', () => {
+    expect(isEmptyEntry({ date: '2024-03-01', moods: ['Sad'] })).toBe(false);
   });
 });
 

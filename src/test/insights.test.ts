@@ -582,7 +582,7 @@ describe('helpers', () => {
     expect(
       daysWithData([
         { date: '2024-03-01', steps: 0 },
-        { date: '2024-03-02', note: 'nothing' },
+        { date: '2024-03-02', moods: ['Neutral'] },
         { date: '2024-03-03', weightKg: 80 },
       ]),
     ).toBe(2);

@@ -67,10 +67,23 @@ describe('sanitizeEntry', () => {
     });
   });
 
-  it('trims and caps notes', () => {
-    const entry = sanitizeEntry({ date: '2024-03-08', note: '  felt good  ' })!;
-    expect(entry.note).toBe('felt good');
-    expect(sanitizeEntry({ date: '2024-03-08', note: 'x'.repeat(500) })!.note).toHaveLength(400);
+  it('normalises mood tags and de-duplicates them', () => {
+    const entry = sanitizeEntry({
+      date: '2024-03-08',
+      moods: ['  Calm ', 'Calm', 'High Energy'],
+    })!;
+    expect(entry.moods).toEqual(['Calm', 'High Energy']);
+  });
+
+  it('migrates a legacy comma-separated note into tags', () => {
+    expect(sanitizeEntry({ date: '2024-03-08', note: ' Happy , Anxious ' })!.moods).toEqual([
+      'Happy',
+      'Anxious',
+    ]);
+  });
+
+  it('drops an empty mood list', () => {
+    expect(sanitizeEntry({ date: '2024-03-08', moods: ['  ', ''] })).toEqual({ date: '2024-03-08' });
   });
 
   it('accepts every metric at its boundary values', () => {

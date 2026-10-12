@@ -19,6 +19,9 @@ activity level, goals) unlocks the energy-balance and goal-tracking analysis.
   date as before.
 - **Four timelines** — Recharts line charts with a 7-day rolling average, the
   latest/average/trend stats, and a dashed goal line for any goal you set.
+- **Mood tags** — tag any day with one or more moods from a grouped palette,
+  and a pie chart above the timelines shows how often each tag was logged in
+  the selected window.
 - **Insight engine** — 14 rules across data quality, body composition, weight,
   recovery, activity and energy. Each insight shows the numbers it used
   (`evidence`) and what to do about it (`recommendations`).
@@ -79,6 +82,7 @@ src/
     series.ts            Entries -> ordered series and per-metric summaries
     insights.ts          The rule engine: analyzeHealth() + THRESHOLDS
     charts.ts            Recharts-shaped data, gaps as null, axis domains
+    moods.ts             Mood-tag catalog, normalisation and window counts
     storage.ts           localStorage read/write with defensive sanitizing
     backup.ts            JSON export/import envelope for entries + profile
   hooks/
@@ -130,7 +134,7 @@ balance, calorie stability, and intake-vs-weight agreement.
 pnpm test
 ```
 
-385 tests across 11 files, mirroring the `lib/` modules one-to-one, plus component
+401 tests across 12 files, mirroring the `lib/` modules one-to-one, plus component
 and hook tests. Notable techniques:
 
 - Determinism: tests always pass an explicit `referenceDate`, so no assertion

@@ -10,6 +10,7 @@
  */
 
 import { isValidISODate } from './date.ts';
+import { normalizeMoods } from './moods.ts';
 import { mergeEntries, sortEntries } from './series.ts';
 import { METRIC_RANGES } from '../types.ts';
 import type { DailyEntry, Profile, ThemeMode } from '../types.ts';
@@ -89,8 +90,10 @@ export function sanitizeEntry(value: unknown): DailyEntry | null {
   const calories = coerceMetric(value.calories, METRIC_RANGES.calories);
   if (calories !== undefined) entry.calories = calories;
 
-  const note = coerceString(value.note, 400);
-  if (note !== undefined) entry.note = note;
+  // `note` is the pre-migration field: an old comma-separated note string is
+  // split into tags rather than thrown away, so existing logs keep their data.
+  const moods = normalizeMoods(value.moods ?? value.note);
+  if (moods.length > 0) entry.moods = moods;
 
   return entry;
 }
