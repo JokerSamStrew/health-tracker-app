@@ -14,7 +14,7 @@ import { buildChartData } from './lib/charts.ts';
 import { formatShortDate } from './lib/date.ts';
 import { DEFAULT_WINDOW_DAYS } from './lib/insights.ts';
 import { countMoods } from './lib/moods.ts';
-import type { DailyEntry } from './types.ts';
+import type { DailyEntry, Profile } from './types.ts';
 
 const WINDOW_OPTIONS = [7, 14, 30, 90] as const;
 
@@ -58,6 +58,9 @@ function generateDemoData(days: number, endDate: string): DailyEntry[] {
 export default function App() {
   const [windowDays, setWindowDays] = useState<number>(DEFAULT_WINDOW_DAYS);
   const [editingEntry, setEditingEntry] = useState<DailyEntry | null>(null);
+  // Bumped on import so the profile panel remounts and shows the imported
+  // profile instead of the values it was seeded with on mount.
+  const [profileRevision, setProfileRevision] = useState(0);
   const { theme, toggleTheme } = useTheme();
   const {
     entries,
@@ -87,6 +90,11 @@ export default function App() {
 
   function handleSeed(): void {
     for (const entry of generateDemoData(90, today)) upsertEntry(entry);
+  }
+
+  function handleImport(importedEntries: DailyEntry[], importedProfile: Profile): void {
+    importData(importedEntries, importedProfile);
+    setProfileRevision((value) => value + 1);
   }
 
   return (
@@ -225,6 +233,7 @@ export default function App() {
           </div>
           <div className="app__column">
             <ProfilePanel
+              key={profileRevision}
               profile={profile}
               latestWeightKg={latestWeight}
               referenceDate={today}
@@ -235,7 +244,7 @@ export default function App() {
               entries={entries}
               profile={profile}
               referenceDate={today}
-              onImport={importData}
+              onImport={handleImport}
             />
           </div>
         </div>

@@ -134,11 +134,11 @@ balance, calorie stability, and intake-vs-weight agreement.
 pnpm test
 ```
 
-401 tests across 12 files, mirroring the `lib/` modules one-to-one, plus component
-and hook tests. Notable techniques:
+402 tests across 13 files, mirroring the `lib/` modules one-to-one, plus component,
+hook and app-shell tests. Notable techniques:
 
-- Determinism: tests always pass an explicit `referenceDate`, so no assertion
-  depends on the current date.
+- Determinism: analysis tests always pass an explicit `referenceDate`, so no
+  assertion depends on the current date.
 - Storage is injected via a `StorageLike` interface, so parsing and sanitizing
   are tested against an in-memory fake rather than a real browser store.
 - Chart tests stub `ResizeObserver` and `getBoundingClientRect`, because jsdom
