@@ -7,7 +7,13 @@ export interface SummaryCardsProps {
   report: HealthReport;
 }
 
-const DIGITS: Record<MetricKey, number> = { weight: 1, steps: 0, sleep: 1, calories: 0 };
+const DIGITS: Record<MetricKey, number> = {
+  weight: 1,
+  steps: 0,
+  sleep: 1,
+  activity: 1,
+  calories: 0,
+};
 
 /** Values where "down" is the desirable direction. */
 const LOWER_IS_BETTER: Partial<Record<MetricKey, boolean>> = { weight: true, calories: true };

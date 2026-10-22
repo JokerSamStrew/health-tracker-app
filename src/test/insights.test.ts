@@ -370,6 +370,101 @@ describe('sleep rules', () => {
   });
 });
 
+describe('activity rules', () => {
+  it('is positive when the goal is met', () => {
+    // The default goal is 3/5, so an average of 3 lands exactly on target.
+    const entries = makeSeries(14, () => ({ activityRating: 3 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    const insight = insightById(report.insights, 'activity.average');
+    expect(insight.severity).toBe('positive');
+    expect(insight.title).toBe('Physical activity is on target');
+  });
+
+  it('warns when the average is very low', () => {
+    // 2/5 is exactly the very-low threshold.
+    const entries = makeSeries(14, () => ({ activityRating: 2 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    const insight = insightById(report.insights, 'activity.average');
+    expect(insight.severity).toBe('warning');
+    expect(insight.title).toBe('Physical activity is very low');
+  });
+
+  it('notes a moderate shortfall against the goal', () => {
+    // 2.4/5 sits 0.6 below the goal of 3, just past the 0.5 tolerance.
+    const entries = makeSeries(14, () => ({ activityRating: 2.4 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    const insight = insightById(report.insights, 'activity.average');
+    expect(insight.severity).toBe('info');
+    expect(insight.title).toBe('Activity below target');
+  });
+
+  it('respects a custom activity goal', () => {
+    // An average of 2.5 meets a personal goal of 2.5 exactly.
+    const entries = makeSeries(14, () => ({ activityRating: 2.5 }));
+    const report = analyzeHealth(
+      entries,
+      { ...BASE_PROFILE, activityGoalRating: 2.5 },
+      { referenceDate: REFERENCE },
+    );
+    expect(insightById(report.insights, 'activity.average').severity).toBe('positive');
+  });
+
+  it('does not fire without enough days', () => {
+    const entries = makeSeries(2, () => ({ activityRating: 3 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    expect(report.insights.some((i) => i.id === 'activity.average')).toBe(false);
+  });
+
+  it('is positive about a steady activity rating', () => {
+    const entries = makeSeries(14, () => ({ activityRating: 3 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    expect(insightById(report.insights, 'activity.regularity').severity).toBe('positive');
+  });
+
+  it('notes a bursty activity rating', () => {
+    // Alternating 2 and 5: mean 3.5, standard deviation 1.5 -> ~43% CV.
+    const entries = makeSeries(14, (i) => ({ activityRating: i % 2 === 0 ? 2 : 5 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    const insight = insightById(report.insights, 'activity.regularity');
+    expect(insight.severity).toBe('info');
+    expect(insight.title).toBe('Activity comes in bursts');
+  });
+
+  it('notices a high rating with very few steps', () => {
+    // 2000 steps is 25% of the 8000 step goal, below the 50% very-low ratio.
+    const entries = makeSeries(14, () => ({ activityRating: 5, steps: 2000 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    const insight = insightById(report.insights, 'activity.steps-alignment');
+    expect(insight.severity).toBe('info');
+    expect(insight.title).toBe('Your step count understates your training');
+  });
+
+  it('notices a low rating when the step goal is met', () => {
+    // 9000 steps clears the goal; a 2.5 rating is below the goal of 3 but
+    // above the very-low threshold, so the average rule does not cover it.
+    const entries = makeSeries(14, () => ({ activityRating: 2.5, steps: 9000 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    const insight = insightById(report.insights, 'activity.steps-alignment');
+    expect(insight.severity).toBe('info');
+    expect(insight.title).toBe('Your activity rating looks low');
+  });
+
+  it('leaves a very low rating to the average rule', () => {
+    const entries = makeSeries(14, () => ({ activityRating: 1.5, steps: 9000 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    expect(report.insights.some((i) => i.id === 'activity.steps-alignment')).toBe(false);
+    expect(insightById(report.insights, 'activity.average').title).toBe(
+      'Physical activity is very low',
+    );
+  });
+
+  it('does not compare rating and steps without a step series', () => {
+    const entries = makeSeries(14, () => ({ activityRating: 5 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    expect(report.insights.some((i) => i.id === 'activity.steps-alignment')).toBe(false);
+  });
+});
+
 describe('step rules', () => {
   it('is positive when the goal is met', () => {
     const entries = makeSeries(14, () => ({ steps: 11000 }));

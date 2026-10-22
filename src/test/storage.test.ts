@@ -143,6 +143,7 @@ describe('sanitizeProfile', () => {
       dailyCalorieGoal: 2400,
       dailyStepGoal: 10000,
       sleepGoalQuality: 4.5,
+      activityGoalRating: 4,
     });
     expect(profile).toEqual({
       name: 'Sam',
@@ -154,6 +155,23 @@ describe('sanitizeProfile', () => {
       dailyCalorieGoal: 2400,
       dailyStepGoal: 10000,
       sleepGoalQuality: 4.5,
+      activityGoalRating: 4,
+    });
+  });
+
+  it('coerces an activity rating given as a numeric string', () => {
+    expect(sanitizeEntry({ date: '2024-03-08', activityRating: '3.5' })).toEqual({
+      date: '2024-03-08',
+      activityRating: 3.5,
+    });
+  });
+
+  it('drops an activity rating outside the 1-5 range', () => {
+    expect(sanitizeEntry({ date: '2024-03-08', activityRating: 6 })).toEqual({
+      date: '2024-03-08',
+    });
+    expect(sanitizeEntry({ date: '2024-03-08', activityRating: 0 })).toEqual({
+      date: '2024-03-08',
     });
   });
 
@@ -167,6 +185,8 @@ describe('sanitizeProfile', () => {
     expect(sanitizeProfile({ birthDate: 'not-a-date' })).toEqual({});
     expect(sanitizeProfile({ heightCm: 400 })).toEqual({});
     expect(sanitizeProfile({ sleepGoalQuality: 6 })).toEqual({});
+    expect(sanitizeProfile({ activityGoalRating: 6 })).toEqual({});
+    expect(sanitizeProfile({ activityGoalRating: 0 })).toEqual({});
   });
 
   it('drops an invalid sex or activity level', () => {

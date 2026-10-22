@@ -87,6 +87,9 @@ export function sanitizeEntry(value: unknown): DailyEntry | null {
   const sleep = coerceMetric(value.sleepQuality, METRIC_RANGES.sleep);
   if (sleep !== undefined) entry.sleepQuality = sleep;
 
+  const activity = coerceMetric(value.activityRating, METRIC_RANGES.activity);
+  if (activity !== undefined) entry.activityRating = activity;
+
   const calories = coerceMetric(value.calories, METRIC_RANGES.calories);
   if (calories !== undefined) entry.calories = calories;
 
@@ -156,6 +159,9 @@ export function sanitizeProfile(value: unknown): Profile {
 
   const sleepGoalQuality = coerceOptionalNumber(value.sleepGoalQuality, 1, 5);
   if (sleepGoalQuality !== undefined) profile.sleepGoalQuality = sleepGoalQuality;
+
+  const activityGoalRating = coerceOptionalNumber(value.activityGoalRating, 1, 5);
+  if (activityGoalRating !== undefined) profile.activityGoalRating = activityGoalRating;
 
   return profile;
 }

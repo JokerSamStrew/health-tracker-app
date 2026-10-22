@@ -90,6 +90,20 @@ describe('buildChartData', () => {
     expect(data[0]!.label).toBe('Mar 1');
     expect(data[0]!.day).toBe(1);
   });
+
+  it('carries the activity rating and its rolling average', () => {
+    const entries: DailyEntry[] = [
+      { date: '2024-03-02', activityRating: 3 },
+      { date: '2024-03-08', activityRating: 5 },
+    ];
+    const data = buildChartData(entries, REFERENCE, 8);
+    // Mar 1 has no entry, so the gap is filled with null.
+    expect(data[0]!.activityRating).toBeNull();
+    expect(data[1]!.activityRating).toBe(3);
+    expect(data.at(-1)!.activityRating).toBe(5);
+    // The 7-day window ending on Mar 8 holds both logged ratings.
+    expect(data.at(-1)!.activityAvg7).toBeCloseTo(4, 10);
+  });
 });
 
 describe('CHART_KEYS', () => {
@@ -97,6 +111,7 @@ describe('CHART_KEYS', () => {
     expect(CHART_KEYS.weight).toEqual({ value: 'weightKg', average: 'weightAvg7' });
     expect(CHART_KEYS.steps).toEqual({ value: 'steps', average: 'stepsAvg7' });
     expect(CHART_KEYS.sleep).toEqual({ value: 'sleepQuality', average: 'sleepAvg7' });
+    expect(CHART_KEYS.activity).toEqual({ value: 'activityRating', average: 'activityAvg7' });
     expect(CHART_KEYS.calories).toEqual({ value: 'calories', average: 'caloriesAvg7' });
   });
 });

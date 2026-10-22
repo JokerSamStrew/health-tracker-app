@@ -31,6 +31,7 @@ type FormState = {
   dailyCalorieGoal: string;
   dailyStepGoal: string;
   sleepGoalQuality: string;
+  activityGoalRating: string;
 };
 
 function toFormState(profile: Profile): FormState {
@@ -44,6 +45,8 @@ function toFormState(profile: Profile): FormState {
     dailyCalorieGoal: profile.dailyCalorieGoal !== undefined ? String(profile.dailyCalorieGoal) : '',
     dailyStepGoal: profile.dailyStepGoal !== undefined ? String(profile.dailyStepGoal) : '',
     sleepGoalQuality: profile.sleepGoalQuality !== undefined ? String(profile.sleepGoalQuality) : '',
+    activityGoalRating:
+      profile.activityGoalRating !== undefined ? String(profile.activityGoalRating) : '',
   };
 }
 
@@ -85,6 +88,9 @@ export function ProfilePanel({
       : {}),
     ...(optionalNumber(form.sleepGoalQuality) !== undefined
       ? { sleepGoalQuality: optionalNumber(form.sleepGoalQuality) }
+      : {}),
+    ...(optionalNumber(form.activityGoalRating) !== undefined
+      ? { activityGoalRating: optionalNumber(form.activityGoalRating) }
       : {}),
   };
 
@@ -241,6 +247,21 @@ export function ProfilePanel({
               value={form.sleepGoalQuality}
               placeholder="4"
               onChange={(event) => update('sleepGoalQuality', event.target.value)}
+              onBlur={commit}
+            />
+          </label>
+
+          <label className="field">
+            <span>Activity goal (/5)</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={1}
+              max={5}
+              step={0.5}
+              value={form.activityGoalRating}
+              placeholder="3"
+              onChange={(event) => update('activityGoalRating', event.target.value)}
               onBlur={commit}
             />
           </label>

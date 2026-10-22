@@ -18,11 +18,13 @@ export interface ChartPoint {
   weightKg: number | null;
   steps: number | null;
   sleepQuality: number | null;
+  activityRating: number | null;
   calories: number | null;
   /** 7-day rolling averages, used as trend lines on the charts. */
   weightAvg7: number | null;
   stepsAvg7: number | null;
   sleepAvg7: number | null;
+  activityAvg7: number | null;
   caloriesAvg7: number | null;
   /** Calendar day of month, handy for the label column. */
   day: number;
@@ -48,10 +50,12 @@ export function buildChartData(
       weightKg: entry?.weightKg ?? null,
       steps: entry?.steps ?? null,
       sleepQuality: entry?.sleepQuality ?? null,
+      activityRating: entry?.activityRating ?? null,
       calories: entry?.calories ?? null,
       weightAvg7: null,
       stepsAvg7: null,
       sleepAvg7: null,
+      activityAvg7: null,
       caloriesAvg7: null,
     };
   });
@@ -68,6 +72,10 @@ export function buildChartData(
     raw.map((point) => point.sleepQuality),
     ROLLING_WINDOW,
   );
+  const activity = rollingAverage(
+    raw.map((point) => point.activityRating),
+    ROLLING_WINDOW,
+  );
   const calories = rollingAverage(
     raw.map((point) => point.calories),
     ROLLING_WINDOW,
@@ -78,6 +86,7 @@ export function buildChartData(
     weightAvg7: weights[index] ?? null,
     stepsAvg7: steps[index] ?? null,
     sleepAvg7: sleep[index] ?? null,
+    activityAvg7: activity[index] ?? null,
     caloriesAvg7: calories[index] ?? null,
   }));
 }
@@ -87,6 +96,7 @@ export const CHART_KEYS: Record<MetricKey, { value: keyof ChartPoint; average: k
   weight: { value: 'weightKg', average: 'weightAvg7' },
   steps: { value: 'steps', average: 'stepsAvg7' },
   sleep: { value: 'sleepQuality', average: 'sleepAvg7' },
+  activity: { value: 'activityRating', average: 'activityAvg7' },
   calories: { value: 'calories', average: 'caloriesAvg7' },
 };
 

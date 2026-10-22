@@ -208,7 +208,13 @@ describe('summarizeMetric', () => {
 describe('summarizeAll', () => {
   it('returns a summary for every metric', () => {
     const summaries = summarizeAll(UNSORTED, '2024-03-01');
-    expect(Object.keys(summaries).sort()).toEqual(['calories', 'sleep', 'steps', 'weight']);
+    expect(Object.keys(summaries).sort()).toEqual([
+      'activity',
+      'calories',
+      'sleep',
+      'steps',
+      'weight',
+    ]);
   });
 
   it('excludes entries before the window start', () => {

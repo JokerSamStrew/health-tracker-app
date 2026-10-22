@@ -17,13 +17,14 @@ import {
 import type { DailyEntry, MetricKey, MetricSummary } from '../types.ts';
 import { METRIC_KEYS, METRIC_UNITS } from '../types.ts';
 
-export type MetricField = 'weightKg' | 'steps' | 'sleepQuality' | 'calories';
+export type MetricField = 'weightKg' | 'steps' | 'sleepQuality' | 'activityRating' | 'calories';
 
 /** Which `DailyEntry` field backs each metric. */
 export const METRIC_FIELD: Record<MetricKey, MetricField> = {
   weight: 'weightKg',
   steps: 'steps',
   sleep: 'sleepQuality',
+  activity: 'activityRating',
   calories: 'calories',
 };
 
@@ -32,6 +33,7 @@ export const METRIC_DIGITS: Record<MetricKey, number> = {
   weight: 1,
   steps: 0,
   sleep: 1,
+  activity: 1,
   calories: 0,
 };
 
@@ -66,6 +68,7 @@ function stripUndefined(entry: DailyEntry): DailyEntry {
   if (entry.weightKg !== undefined) result.weightKg = entry.weightKg;
   if (entry.steps !== undefined) result.steps = entry.steps;
   if (entry.sleepQuality !== undefined) result.sleepQuality = entry.sleepQuality;
+  if (entry.activityRating !== undefined) result.activityRating = entry.activityRating;
   if (entry.calories !== undefined) result.calories = entry.calories;
   if (entry.moods !== undefined) result.moods = [...entry.moods];
   return result;
@@ -77,6 +80,7 @@ export function isEmptyEntry(entry: DailyEntry): boolean {
     entry.weightKg === undefined &&
     entry.steps === undefined &&
     entry.sleepQuality === undefined &&
+    entry.activityRating === undefined &&
     entry.calories === undefined &&
     (entry.moods?.length ?? 0) === 0
   );

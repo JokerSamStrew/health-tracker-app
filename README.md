@@ -3,9 +3,10 @@
 A local-first web app for logging daily health metrics and turning that log into
 detected problems plus concrete recommendations.
 
-Four metrics are tracked per day — **weight**, **steps**, **sleep quality** and
-**calories eaten** — and optional profile data (birth date, sex, height,
-activity level, goals) unlocks the energy-balance and goal-tracking analysis.
+Five metrics are tracked per day — **weight**, **steps**, **sleep quality**,
+**physical activity** and **calories eaten** — and optional profile data (birth
+date, sex, height, activity level, goals) unlocks the energy-balance and
+goal-tracking analysis.
 
 > Not medical advice. The app surfaces patterns in your own logs; it does not
 > diagnose anything. Talk to a doctor about health concerns.
@@ -17,12 +18,12 @@ activity level, goals) unlocks the energy-balance and goal-tracking analysis.
 - **Bulk entry** — switch the entry form to a custom date range and one set of
   values is applied to every day between the two dates, or save a single exact
   date as before.
-- **Four timelines** — Recharts line charts with a 7-day rolling average, the
+- **Five timelines** — Recharts line charts with a 7-day rolling average, the
   latest/average/trend stats, and a dashed goal line for any goal you set.
 - **Mood tags** — tag any day with one or more moods from a grouped palette,
   and a pie chart above the timelines shows how often each tag was logged in
   the selected window.
-- **Insight engine** — 14 rules across data quality, body composition, weight,
+- **Insight engine** — 17 rules across data quality, body composition, weight,
   recovery, activity and energy. Each insight shows the numbers it used
   (`evidence`) and what to do about it (`recommendations`).
 - **Cross-metric analysis** — e.g. poor sleep alongside a rising weight, or
@@ -111,8 +112,9 @@ testable.
 
 The rules cover: insufficient data, logging coverage, missing metrics, BMI,
 weight trend and pace, distance to target weight, sleep quality and
-consistency, sleep-vs-weight interaction, step volume and trend, calorie
-balance, calorie stability, and intake-vs-weight agreement.
+consistency, sleep-vs-weight interaction, step volume and trend, activity
+rating versus goal, activity consistency, activity-versus-steps agreement,
+calorie balance, calorie stability, and intake-vs-weight agreement.
 
 ## Data and privacy
 
@@ -134,7 +136,7 @@ balance, calorie stability, and intake-vs-weight agreement.
 pnpm test
 ```
 
-402 tests across 13 files, mirroring the `lib/` modules one-to-one, plus component,
+418 tests across 13 files, mirroring the `lib/` modules one-to-one, plus component,
 hook and app-shell tests. Notable techniques:
 
 - Determinism: analysis tests always pass an explicit `referenceDate`, so no

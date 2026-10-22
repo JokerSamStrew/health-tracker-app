@@ -42,8 +42,20 @@ interface ChartTokens {
 
 /** Per-theme metric colours, tuned to contrast with each surface. */
 const METRIC_COLORS: Record<ThemeMode, Record<MetricKey, string>> = {
-  light: { weight: '#0f766e', steps: '#2563eb', sleep: '#7c3aed', calories: '#ea580c' },
-  dark: { weight: '#2dd4bf', steps: '#60a5fa', sleep: '#a78bfa', calories: '#fb923c' },
+  light: {
+    weight: '#0f766e',
+    steps: '#2563eb',
+    sleep: '#7c3aed',
+    activity: '#be123c',
+    calories: '#ea580c',
+  },
+  dark: {
+    weight: '#2dd4bf',
+    steps: '#60a5fa',
+    sleep: '#a78bfa',
+    activity: '#fb7185',
+    calories: '#fb923c',
+  },
 };
 
 const AXIS_TOKENS: Record<ThemeMode, ChartTokens> = {

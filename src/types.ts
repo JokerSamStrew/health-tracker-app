@@ -5,10 +5,11 @@
  * - weight:  kilograms (kg)
  * - steps:   steps per day (count)
  * - sleep:   subjective quality rating, 1-5 (/5)
+ * - activity: subjective effort rating, 1-5 (/5)
  * - calories: kilocalories per day (kcal)
  */
 
-export const METRIC_KEYS = ['weight', 'steps', 'sleep', 'calories'] as const;
+export const METRIC_KEYS = ['weight', 'steps', 'sleep', 'activity', 'calories'] as const;
 
 export type MetricKey = (typeof METRIC_KEYS)[number];
 
@@ -16,6 +17,7 @@ export const METRIC_UNITS: Record<MetricKey, string> = {
   weight: 'kg',
   steps: 'steps',
   sleep: '/5',
+  activity: '/5',
   calories: 'kcal',
 };
 
@@ -24,6 +26,7 @@ export const METRIC_RANGES: Record<MetricKey, { min: number; max: number; step: 
   weight: { min: 20, max: 400, step: 0.1 },
   steps: { min: 0, max: 200_000, step: 1 },
   sleep: { min: 1, max: 5, step: 0.5 },
+  activity: { min: 1, max: 5, step: 0.5 },
   calories: { min: 0, max: 20_000, step: 1 },
 };
 
@@ -35,6 +38,8 @@ export interface DailyEntry {
   steps?: number;
   /** Subjective sleep quality on a 1-5 scale, halves allowed. */
   sleepQuality?: number;
+  /** Subjective physical activity level on a 1-5 scale, halves allowed. */
+  activityRating?: number;
   calories?: number;
   /**
    * Mood tags for the day, e.g. `['Happy', 'High Energy']`. An ordered,
@@ -64,6 +69,8 @@ export interface Profile {
   dailyStepGoal?: number;
   /** Nightly sleep quality target on a 1-5 scale. Defaults to 4. */
   sleepGoalQuality?: number;
+  /** Daily physical activity target on a 1-5 scale. Defaults to 3. */
+  activityGoalRating?: number;
 }
 
 export interface MetricSummary {
@@ -99,13 +106,7 @@ export interface Recommendation {
 }
 
 /** Broad grouping used to lay insights out in the UI. */
-export type InsightCategory =
-  | MetricKey
-  | 'body'
-  | 'activity'
-  | 'recovery'
-  | 'energy'
-  | 'data';
+export type InsightCategory = MetricKey | 'body' | 'recovery' | 'energy' | 'data';
 
 export interface Insight {
   /** Stable identifier, useful as a React key and in tests. */
@@ -137,5 +138,6 @@ export interface HealthReport {
 export const DEFAULT_PROFILE: Profile = {
   dailyStepGoal: 8000,
   sleepGoalQuality: 4,
+  activityGoalRating: 3,
   activityLevel: 'moderate',
 };

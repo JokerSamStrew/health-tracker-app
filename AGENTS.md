@@ -5,10 +5,10 @@ changing code.
 
 ## What this project is
 
-A local-first health tracker. Users log weight, steps, sleep quality and calories
-eaten per day; the app analyses the log and surfaces problems plus
-recommendations. React 19 + TypeScript + Vite + Recharts, built and tested with
-pnpm.
+A local-first health tracker. Users log weight, steps, sleep quality, physical
+activity and calories eaten per day; the app analyses the log and surfaces
+problems plus recommendations. React 19 + TypeScript + Vite + Recharts, built
+and tested with pnpm.
 
 There is **no backend, no account and no network access**. `localStorage` is the
 only persistence layer. Do not add a server, an API client or a fetch call
@@ -64,7 +64,7 @@ src/lib/stats.ts    mean/median/stdDev, moving average, least-squares
                     regression, Pearson correlation, number formatting.
 src/lib/health.ts   BMI, BMR (Mifflin-St Jeor), TDEE, calorie target for goal.
 src/lib/series.ts   Entries -> sorted/merged series + per-metric summaries.
-src/lib/insights.ts analyzeHealth() and the 14 rules. THRESHOLDS lives here.
+src/lib/insights.ts analyzeHealth() and the 17 rules. THRESHOLDS lives here.
 src/lib/charts.ts   Recharts-shaped points, null gaps, padded axis domains.
 src/lib/moods.ts    Mood-tag catalog, normalisation, window counts.
 src/lib/storage.ts  localStorage read/write, sanitizing, memory fake.
@@ -133,7 +133,7 @@ failures.
 | TDEE at moderate activity | BMR x 1.55 = **2759** kcal for the male profile above |
 | `KCAL_PER_KG` | 7700 |
 | `SAFE_PACE_KG_PER_WEEK` | 0.45 kg/wk = 495 kcal/day |
-| Default step goal / sleep quality goal | 8000 steps / 4 (out of 5) |
+| Default step goal / sleep quality goal / activity goal | 8000 steps / 4 (out of 5) / 3 (out of 5) |
 | `MIN_DAYS_FOR_INSIGHTS` / `MIN_DAYS_FOR_TREND` | 3 / 5 |
 | Health score | `100 - 18*critical - 9*warning`, clamped 0–100, `null` below the minimum |
 
@@ -141,7 +141,7 @@ Activity multipliers: sedentary 1.2, light 1.375, moderate 1.55, active 1.725,
 athlete 1.9.
 
 `METRIC_RANGES`: weight 20–400 (step 0.1), steps 0–200000, sleep 1–5 (step 0.5),
-calories 0–20000.
+activity 1–5 (step 0.5), calories 0–20000.
 
 ## Testing notes
 

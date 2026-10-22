@@ -68,6 +68,17 @@ describe('EntryForm', () => {
     });
   });
 
+  it('saves the physical activity rating', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+
+    await user.selectOptions(screen.getByLabelText(/physical activity/i), '3.5');
+    await user.click(screen.getByRole('button', { name: /save entry/i }));
+
+    expect(onSave).toHaveBeenCalledWith({ date: REFERENCE, activityRating: 3.5 });
+  });
+
   it('omits fields left blank', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
@@ -352,6 +363,7 @@ describe('formToEntry', () => {
     weightKg: '',
     steps: '',
     sleepQuality: '',
+    activityRating: '',
     calories: '',
     moods: [],
   };
@@ -364,6 +376,7 @@ describe('formToEntry', () => {
   it('keeps fractional metrics as entered', () => {
     expect(formToEntry({ ...base, weightKg: '80.55' }).weightKg).toBe(80.55);
     expect(formToEntry({ ...base, sleepQuality: '4.5' }).sleepQuality).toBe(4.5);
+    expect(formToEntry({ ...base, activityRating: '3.5' }).activityRating).toBe(3.5);
   });
 
   it('accepts a comma decimal separator', () => {
@@ -386,6 +399,7 @@ describe('formToEntries', () => {
     weightKg: '',
     steps: '',
     sleepQuality: '',
+    activityRating: '',
     calories: '',
     moods: [],
   };
@@ -446,7 +460,7 @@ describe('SummaryCards', () => {
   it('renders a card for each metric plus the score', () => {
     render(<SummaryCards report={report} />);
     expect(screen.getByText('Health score')).toBeInTheDocument();
-    for (const label of ['Weight', 'Steps', 'Sleep', 'Calories']) {
+    for (const label of ['Weight', 'Steps', 'Sleep', 'Physical activity', 'Calories']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });
@@ -524,7 +538,7 @@ describe('HistoryTable', () => {
       <HistoryTable entries={[{ date: REFERENCE, weightKg: 80 }]} onEdit={vi.fn()} onDelete={vi.fn()} />,
     );
     const row = screen.getByRole('row', { name: /mar 14/i });
-    expect(within(row).getAllByText('—').length).toBe(3);
+    expect(within(row).getAllByText('—').length).toBe(4);
   });
 
   it('filters by mood tag', async () => {
@@ -731,6 +745,29 @@ describe('ProfilePanel', () => {
 
     expect(onChange).toHaveBeenCalled();
     expect(onChange.mock.calls.at(-1)![0].heightCm).toBe(185);
+  });
+
+  it('reports a new activity goal', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <ProfilePanel
+        profile={{ birthDate: '1994-03-14', sex: 'male', heightCm: 180 }}
+        latestWeightKg={80}
+        referenceDate={REFERENCE}
+        onChange={onChange}
+        onClearAll={vi.fn()}
+      />,
+    );
+
+    const goal = screen.getByLabelText(/activity goal/i);
+    await user.clear(goal);
+    await user.type(goal, '4');
+    // The panel commits on blur, not on every keystroke.
+    await user.tab();
+
+    expect(onChange).toHaveBeenCalled();
+    expect(onChange.mock.calls.at(-1)![0].activityGoalRating).toBe(4);
   });
 
   it('requires a second click to delete everything', async () => {

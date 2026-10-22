@@ -41,20 +41,28 @@ interface FormState {
   weightKg: string;
   steps: string;
   sleepQuality: string;
+  activityRating: string;
   calories: string;
   /** Selected mood tags, in the order they were toggled on. */
   moods: string[];
 }
 
-type FieldName = 'weightKg' | 'steps' | 'sleepQuality' | 'calories';
+type FieldName = 'weightKg' | 'steps' | 'sleepQuality' | 'activityRating' | 'calories';
 
-const METRIC_FIELDS: FieldName[] = ['weightKg', 'steps', 'sleepQuality', 'calories'];
+const METRIC_FIELDS: FieldName[] = [
+  'weightKg',
+  'steps',
+  'sleepQuality',
+  'activityRating',
+  'calories',
+];
 
 /** Form field -> metric key, needed because `weightKg` maps to `weight`. */
 const METRIC_FOR_FIELD: Record<FieldName, MetricKey> = {
   weightKg: 'weight',
   steps: 'steps',
   sleepQuality: 'sleep',
+  activityRating: 'activity',
   calories: 'calories',
 };
 
@@ -71,6 +79,19 @@ export const SLEEP_QUALITY_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '5', label: '5 - Excellent' },
 ];
 
+/** Selectable physical activity ratings, 1-5 with half-steps. */
+export const ACTIVITY_RATING_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '1', label: '1 - Rest day' },
+  { value: '1.5', label: '1.5 - Very light' },
+  { value: '2', label: '2 - Light' },
+  { value: '2.5', label: '2.5 - Light to moderate' },
+  { value: '3', label: '3 - Moderate' },
+  { value: '3.5', label: '3.5 - Moderate to active' },
+  { value: '4', label: '4 - Active' },
+  { value: '4.5', label: '4.5 - Very active' },
+  { value: '5', label: '5 - Hard training' },
+];
+
 function emptyForm(today: string): FormState {
   return {
     period: 'day',
@@ -80,6 +101,7 @@ function emptyForm(today: string): FormState {
     weightKg: '',
     steps: '',
     sleepQuality: '',
+    activityRating: '',
     calories: '',
     moods: [],
   };
@@ -95,6 +117,7 @@ function formFromEntry(entry: DailyEntry): FormState {
     weightKg: entry.weightKg !== undefined ? String(entry.weightKg) : '',
     steps: entry.steps !== undefined ? String(entry.steps) : '',
     sleepQuality: entry.sleepQuality !== undefined ? String(entry.sleepQuality) : '',
+    activityRating: entry.activityRating !== undefined ? String(entry.activityRating) : '',
     calories: entry.calories !== undefined ? String(entry.calories) : '',
     moods: entry.moods ? [...entry.moods] : [],
   };
@@ -110,6 +133,7 @@ function clearMeasurements(current: FormState): FormState {
     weightKg: '',
     steps: '',
     sleepQuality: '',
+    activityRating: '',
     calories: '',
     moods: [],
   };
@@ -174,6 +198,9 @@ export function formToEntry(form: FormState): DailyEntry {
 
   const sleep = parseNumber(form.sleepQuality);
   if (sleep !== null) entry.sleepQuality = sleep;
+
+  const activity = parseNumber(form.activityRating);
+  if (activity !== null) entry.activityRating = activity;
 
   const calories = parseNumber(form.calories);
   if (calories !== null) entry.calories = Math.round(calories);
@@ -419,6 +446,28 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
           {errors.sleepQuality ? (
             <small className="field__error" id="entry-sleep-error">
               {errors.sleepQuality}
+            </small>
+          ) : null}
+        </label>
+
+        <label className="field">
+          <span>Physical activity</span>
+          <select
+            value={form.activityRating}
+            onChange={(event) => update('activityRating', event.target.value)}
+            aria-invalid={errors.activityRating ? 'true' : undefined}
+            aria-describedby={errors.activityRating ? 'entry-activity-error' : undefined}
+          >
+            <option value="">Not set</option>
+            {ACTIVITY_RATING_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {errors.activityRating ? (
+            <small className="field__error" id="entry-activity-error">
+              {errors.activityRating}
             </small>
           ) : null}
         </label>

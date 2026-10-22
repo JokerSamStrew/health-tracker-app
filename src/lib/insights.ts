@@ -75,6 +75,14 @@ export const THRESHOLDS = {
   sleepPoorQuality: 3,
   /** Sleep quality coefficient of variation above this percent is "irregular". */
   sleepIrregularCvPercent: 20,
+  /** Activity rating below `goal - this` is flagged as below target. */
+  activityDeficitRating: 0.5,
+  /** Average activity rating at or below this is very low. */
+  activityVeryLowRating: 2,
+  /** Average activity rating at or above this counts as high. */
+  activityHighRating: 4,
+  /** Activity rating coefficient of variation above this percent is "bursty". */
+  activityIrregularCvPercent: 20,
   /** Step goal ratios. */
   stepsVeryLowRatio: 0.5,
   stepsLowRatio: 0.8,
@@ -127,6 +135,10 @@ const BMI_SEVERITY: Record<Exclude<BmiCategory, 'healthy'>, Severity> = {
 
 function sleepGoal(profile: Profile): number {
   return profile.sleepGoalQuality ?? 4;
+}
+
+function activityGoal(profile: Profile): number {
+  return profile.activityGoalRating ?? 3;
 }
 
 function stepGoal(profile: Profile): number {
@@ -230,7 +242,7 @@ function ruleInsufficientData(
       },
       {
         title: 'One entry per day is enough',
-        detail: 'Weight, steps, sleep and calories are all optional, but the more you log the sharper the advice.',
+        detail: 'Weight, steps, sleep, activity and calories are all optional, but the more you log the sharper the advice.',
       },
     ],
   );
@@ -867,6 +879,206 @@ function ruleStepsTrend(summaries: Record<MetricKey, MetricSummary>): Insight | 
   return null;
 }
 
+/** Average physical activity rating against the personal goal. */
+function ruleActivityAverage(
+  profile: Profile,
+  summaries: Record<MetricKey, MetricSummary>,
+): Insight | null {
+  const { count, average } = summaries.activity;
+  if (count < MIN_DAYS_FOR_INSIGHTS || average === null) return null;
+
+  const goal = activityGoal(profile);
+  const avg = round(average, 1);
+  const deficit = round(goal - avg, 1);
+  const evidence = [
+    `Average ${fmt('activity', avg)}/5`,
+    `Goal ${fmt('activity', goal)}/5`,
+    `Based on ${count} days`,
+  ];
+
+  if (avg <= THRESHOLDS.activityVeryLowRating) {
+    return buildInsight(
+      'activity.average',
+      'activity',
+      'warning',
+      'Physical activity is very low',
+      `You are averaging only ${fmt('activity', avg)}/5 for physical activity - barely moving on most days.`,
+      evidence,
+      [
+        {
+          title: 'Start with a 10-minute walk',
+          detail: 'A short daily walk is far easier to keep up than a planned workout, and it counts.',
+        },
+        {
+          title: 'Break up sitting every hour',
+          detail: 'Set a recurring reminder to stand for two minutes.',
+        },
+      ],
+    );
+  }
+
+  if (deficit > THRESHOLDS.activityDeficitRating) {
+    return buildInsight(
+      'activity.average',
+      'activity',
+      'info',
+      'Activity below target',
+      `You are averaging ${fmt('activity', avg)}/5, about ${fmt('activity', deficit)} below your ${fmt('activity', goal)}/5 target.`,
+      evidence,
+      [
+        {
+          title: 'Pick one activity you actually enjoy',
+          detail: 'Three moderate sessions a week is a solid base - consistency beats intensity.',
+        },
+        {
+          title: 'Attach movement to an existing habit',
+          detail: 'A walk straight after lunch removes the decision from the day.',
+        },
+      ],
+    );
+  }
+
+  return buildInsight(
+    'activity.average',
+    'activity',
+    'positive',
+    'Physical activity is on target',
+    `You are averaging ${fmt('activity', avg)}/5, right around your ${fmt('activity', goal)}/5 goal.`,
+    evidence,
+    [
+      {
+        title: 'Keep the rhythm',
+        detail: 'Regular movement protects cardiovascular health, mood and sleep quality.',
+      },
+    ],
+  );
+}
+
+/** How steady the activity rating is from day to day. */
+function ruleActivityRegularity(summaries: Record<MetricKey, MetricSummary>): Insight | null {
+  const { count, average, stdDev } = summaries.activity;
+  if (count < MIN_DAYS_FOR_TREND || average === null || stdDev === null) return null;
+
+  const cv = variationRatio(average, stdDev);
+  if (cv === null) return null;
+
+  const evidence = [
+    `Day-to-day variation: ${fmt('activity', stdDev)}/5 (standard deviation)`,
+    `Coefficient of variation ${round(cv, 0)}%`,
+    `Average ${fmt('activity', average)}/5 across ${count} days`,
+  ];
+
+  if (cv <= THRESHOLDS.activityIrregularCvPercent) {
+    return buildInsight(
+      'activity.regularity',
+      'activity',
+      'positive',
+      'Activity is steady',
+      `Your activity rating varies by only ${round(cv, 0)}%, which is the ideal pattern.`,
+      evidence,
+      [
+        {
+          title: 'Keep the routine',
+          detail: 'Steady movement is easier on the body than alternating hard and idle days.',
+        },
+      ],
+    );
+  }
+
+  return buildInsight(
+    'activity.regularity',
+    'activity',
+    'info',
+    'Activity comes in bursts',
+    `Your activity rating swings by ${round(cv, 0)}%, which usually means a few intense days between quiet ones.`,
+    evidence,
+    [
+      {
+        title: 'Add one easy day between hard ones',
+        detail: 'A 20-minute walk on the quiet days keeps the weekly total up without the spikes.',
+      },
+      {
+        title: 'Judge the week, not the day',
+        detail: 'The weekly average is what carries the health benefit.',
+      },
+    ],
+  );
+}
+
+/**
+ * Cross-check: does the self-rated activity match the logged step count?
+ * A disagreement usually means the two are measuring different things - a
+ * bike, a swim or a weights session adds far fewer steps than it adds effort.
+ */
+function ruleActivityStepsAlignment(
+  profile: Profile,
+  summaries: Record<MetricKey, MetricSummary>,
+): Insight | null {
+  if (summaries.activity.count < MIN_DAYS_FOR_TREND) return null;
+  if (summaries.steps.count < MIN_DAYS_FOR_TREND) return null;
+
+  const rating = summaries.activity.average;
+  const steps = summaries.steps.average;
+  if (rating === null || steps === null) return null;
+
+  const goal = stepGoal(profile);
+  const stepRatio = goal > 0 ? steps / goal : null;
+  if (stepRatio === null) return null;
+
+  const evidence = [
+    `Average activity rating ${fmt('activity', rating)}/5`,
+    `Average ${fmt('steps', steps)} steps per day`,
+    `${Math.round(stepRatio * 100)}% of the daily step goal`,
+  ];
+
+  // A high rating with very few steps means the training was not walkable.
+  if (rating >= THRESHOLDS.activityHighRating && stepRatio < THRESHOLDS.stepsVeryLowRatio) {
+    return buildInsight(
+      'activity.steps-alignment',
+      'activity',
+      'info',
+      'Your step count understates your training',
+      `You rate your activity ${fmt('activity', rating)}/5 but only average ${Math.round(stepRatio * 100)}% of your step goal - cycling, swimming and gym work add far fewer steps.`,
+      evidence,
+      [
+        {
+          title: 'Keep rating those days',
+          detail: 'The rating is what lets the analysis see training that never reaches your step count.',
+        },
+        {
+          title: 'Do not chase the step goal on training days',
+          detail: 'A hard session on 3,000 steps still beats a sedentary 10,000.',
+        },
+      ],
+    );
+  }
+
+  // A moderate rating with the step goal met reads as too harsh. Very low
+  // ratings are left to the average rule, which gives better advice.
+  if (
+    rating < activityGoal(profile) &&
+    rating > THRESHOLDS.activityVeryLowRating &&
+    stepRatio >= 1
+  ) {
+    return buildInsight(
+      'activity.steps-alignment',
+      'activity',
+      'info',
+      'Your activity rating looks low',
+      `You rate your activity ${fmt('activity', rating)}/5 while averaging ${fmt('steps', steps)} steps a day, at or above your goal.`,
+      evidence,
+      [
+        {
+          title: 'Check the rating on those days',
+          detail: 'Walking 8,000 steps is a moderate day, so the number may be understating it.',
+        },
+      ],
+    );
+  }
+
+  return null;
+}
+
 /** Daily intake against the calorie target or the estimated burn. */
 function ruleCalorieBalance(
   profile: Profile,
@@ -1174,6 +1386,9 @@ export function analyzeHealth(
   add(ruleSleepWeightInteraction(summaries));
   add(ruleSteps(profile, summaries));
   add(ruleStepsTrend(summaries));
+  add(ruleActivityAverage(profile, summaries));
+  add(ruleActivityRegularity(summaries));
+  add(ruleActivityStepsAlignment(profile, summaries));
   add(ruleCalorieBalance(profile, summaries, age));
   add(ruleCalorieStability(summaries));
   add(ruleCalorieWeightAlignment(profile, summaries, age));
@@ -1207,5 +1422,6 @@ export const METRIC_LABELS: Record<MetricKey, string> = {
   weight: 'Weight',
   steps: 'Steps',
   sleep: 'Sleep',
+  activity: 'Physical activity',
   calories: 'Calories',
 };

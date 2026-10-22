@@ -11,12 +11,19 @@ export interface HistoryTableProps {
   onDelete: (date: string) => void;
 }
 
-const DIGITS: Record<MetricKey, number> = { weight: 1, steps: 0, sleep: 1, calories: 0 };
+const DIGITS: Record<MetricKey, number> = {
+  weight: 1,
+  steps: 0,
+  sleep: 1,
+  activity: 1,
+  calories: 0,
+};
 
 const EMPTY_MESSAGE: Record<MetricKey, string> = {
   weight: '—',
   steps: '—',
   sleep: '—',
+  activity: '—',
   calories: '—',
 };
 

@@ -41,6 +41,8 @@ function generateDemoData(days: number, endDate: string): DailyEntry[] {
     const skip = rand() < 0.08;
     // Quality rating 2-5 (each integer gets a roughly equal share).
     const sleepQuality = 2 + Math.floor(rand() * 4);
+    // Activity rating 1-5, weighted towards the middle of the scale.
+    const activityRating = 1 + Math.floor(rand() * 5);
     weight += (rand() - 0.55) * 0.18;
     const mood = skip ? 'Low Energy' : DEMO_MOODS[Math.floor(rand() * DEMO_MOODS.length)]!;
     entries.push({
@@ -48,6 +50,7 @@ function generateDemoData(days: number, endDate: string): DailyEntry[] {
       weightKg: Math.round(weight * 10) / 10,
       steps: Math.round(4200 + rand() * 8000),
       sleepQuality,
+      activityRating,
       calories: Math.round(1700 + rand() * 900),
       moods: [mood],
     });
@@ -107,8 +110,8 @@ export default function App() {
           <div>
             <h1>Health Tracker</h1>
             <p>
-              Timeline for weight, steps, sleep and calories &mdash; with analysis and
-              recommendations.
+              Timeline for weight, steps, sleep, activity and calories &mdash; with
+              analysis and recommendations.
             </p>
           </div>
         </div>
@@ -189,6 +192,15 @@ export default function App() {
               summary={report.summaries.sleep}
               goal={profile.sleepGoalQuality}
               goalLabel="Sleep goal"
+              theme={theme}
+            />
+            <TimeSeriesChart
+              title="Physical activity"
+              metric="activity"
+              data={chartData}
+              summary={report.summaries.activity}
+              goal={profile.activityGoalRating}
+              goalLabel="Activity goal"
               theme={theme}
             />
             <TimeSeriesChart
