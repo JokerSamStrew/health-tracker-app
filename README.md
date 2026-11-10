@@ -21,7 +21,12 @@ goal-tracking analysis.
 - **Timelines** — Recharts line charts for all five metrics with a 7-day rolling
   average, the latest/average/trend stats, and a dashed goal line for any goal
   you set, plus a rolling health-score timeline showing how the 0–100 score
-  evolved day by day.
+  evolved day by day. The score chart also carries a dashed **goal line**: the
+  score you would have if every goal in your profile were met, computed by
+  running the same rules over a simulated on-goal log — so it comes out below
+  100 exactly when the goals themselves disagree (e.g. a target weight outside
+  the healthy BMI band, or a calorie goal far from the estimated burn), and the
+  reasons are listed under the chart.
 - **Mood tags** — tag any day with one or more moods from a grouped palette,
   and a pie chart above the timelines shows how often each tag was logged in
   the selected window.
@@ -85,6 +90,8 @@ src/
     series.ts            Entries -> ordered series and per-metric summaries
     insights.ts          The rule engine: analyzeHealth() + THRESHOLDS
     forecast.ts          Weight-goal projection: days to target + arrival date
+    goalscore.ts         The goal health score: what the rules would score
+                         if every profile goal were met
     charts.ts            Recharts-shaped data, gaps as null, axis domains
     moods.ts             Mood-tag catalog, normalisation and window counts
     storage.ts           localStorage read/write with defensive sanitizing
@@ -117,6 +124,13 @@ testable.
   report ending on it would have been — which is what the health-score
   timeline charts. Days before the minimum data threshold are `null`, so the
   chart's gaps mean "not enough data yet".
+- `goalHealthScore(profile, summaries, { referenceDate, windowDays })` in
+  `src/lib/goalscore.ts` simulates a window in which every metric sits exactly
+  on its goal — target weight (or the latest weight held steady), step, sleep
+  and activity goals, and the calorie goal (or the estimated maintenance at
+  that weight) — and runs the real rule engine over it. The result is the
+  score chart's goal line, plus the warning/critical insights that keep it
+  below 100 when the goals contradict each other.
 
 The rules cover: insufficient data, logging coverage, missing metrics, BMI,
 weight trend and pace, distance to target weight, the projected arrival date
@@ -145,7 +159,7 @@ intake-vs-weight agreement.
 pnpm test
 ```
 
-451 tests across 14 files, mirroring the `lib/` modules one-to-one, plus component,
+461 tests across 15 files, mirroring the `lib/` modules one-to-one, plus component,
 hook and app-shell tests. Notable techniques:
 
 - Determinism: analysis tests always pass an explicit `referenceDate`, so no

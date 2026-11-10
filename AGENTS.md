@@ -68,6 +68,10 @@ src/lib/insights.ts analyzeHealth() and the 18 rules, plus scoreTimeline()
                     for the rolling health-score chart. THRESHOLDS lives here.
 src/lib/forecast.ts Weight-goal projection: days to the target and the
                     arrival date, from the window's weight trend.
+src/lib/goalscore.ts The goal health score: simulates a window where every
+                    metric sits on its goal and runs the real rules over it,
+                    so the score chart's goal line can never drift from the
+                    actual scoring. `limiting` explains why it is below 100.
 src/lib/charts.ts   Recharts-shaped points, null gaps, padded axis domains.
 src/lib/moods.ts    Mood-tag catalog, normalisation, window counts.
 src/lib/storage.ts  localStorage read/write, sanitizing, memory fake.
@@ -88,6 +92,8 @@ localStorage
   -> HealthReport { summaries, score, insights, counts }
   -> scoreTimeline(entries, profile, { ... , spanDays })   (replays the
      analysis per day for the health-score chart; App memoizes it)
+  -> goalHealthScore(profile, report.summaries, { ... })  (the score chart's
+     goal line; App memoizes it alongside scoreTimeline)
   -> SummaryCards / TimeSeriesChart / HealthScoreChart / InsightsPanel
 ```
 
@@ -178,7 +184,7 @@ activity 1–5 (step 0.5), calories 0–20000.
   stages or a polysomnogram.
 - The sample-data generator is a deterministic pseudo-random walk, so its output
   is stable but is not real physiological data.
-- The production bundle is ~675 kB (204 kB gzipped), dominated by Recharts.
+- The production bundle is ~690 kB (207 kB gzipped), dominated by Recharts.
 
 ## House rules
 

@@ -610,6 +610,27 @@ input:focus-visible {
   border-radius: var(--radius-sm);
 }
 
+/* Footnote explaining what the score chart's goal line assumes. */
+.chart-goal-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+.chart-goal-note p {
+  margin: 0;
+}
+
+.chart-goal-note__list {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 /* -------------------------------------------------------------------------- */
 /* mood tags                                                                  */
 /* -------------------------------------------------------------------------- */

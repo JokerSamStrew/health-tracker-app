@@ -13,6 +13,7 @@ import { useHealthData } from './hooks/useHealthData.ts';
 import { useTheme } from './hooks/useTheme.ts';
 import { buildChartData } from './lib/charts.ts';
 import { formatShortDate } from './lib/date.ts';
+import { goalHealthScore } from './lib/goalscore.ts';
 import { DEFAULT_WINDOW_DAYS, scoreTimeline } from './lib/insights.ts';
 import { countMoods } from './lib/moods.ts';
 import type { DailyEntry, Profile } from './types.ts';
@@ -94,6 +95,14 @@ export default function App() {
       spanDays: Math.max(windowDays, 14),
     }),
     [entries, profile, today, windowDays],
+  );
+
+  // The score every goal in the profile would produce; depends on the report
+  // only for the latest weight, which stands in for "stay where you are"
+  // when no target weight is set.
+  const goalScore = useMemo(
+    () => goalHealthScore(profile, report.summaries, { referenceDate: today, windowDays }),
+    [profile, report.summaries, today, windowDays],
   );
 
   const moodCounts = useMemo(
@@ -179,7 +188,7 @@ export default function App() {
             </p>
           </div>
           <div className="charts__grid">
-            <HealthScoreChart timeline={scoreTimelineData} theme={theme} />
+            <HealthScoreChart timeline={scoreTimelineData} goal={goalScore} theme={theme} />
             <TimeSeriesChart
               title="Weight"
               metric="weight"

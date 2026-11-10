@@ -3,19 +3,23 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import { formatLongDate, formatShortDate } from '../lib/date.ts';
+import type { GoalHealthScore, GoalTargets } from '../lib/goalscore.ts';
 import type { ScoreTimeline, ScoreTimelinePoint } from '../lib/insights.ts';
 import { formatMetric, formatSigned } from '../lib/stats.ts';
-import type { ThemeMode } from '../types.ts';
+import { METRIC_UNITS, type ThemeMode } from '../types.ts';
 
 export interface HealthScoreChartProps {
   /** Rolling scores, as returned by `scoreTimeline`. */
   timeline: ScoreTimeline;
+  /** Goal score derived from the profile's goals, drawn as a dashed line. */
+  goal?: GoalHealthScore;
   height?: number;
   /** Visual theme; defaults to 'light'. */
   theme?: ThemeMode;
@@ -28,9 +32,12 @@ const SCORE_COLORS: Record<ThemeMode, string> = {
 };
 
 /** Matches the axis tokens the metric charts use, so the rows line up. */
-const AXIS_TOKENS: Record<ThemeMode, { grid: string; axis: string; tick: string }> = {
-  light: { grid: '#e2e8f0', axis: '#cbd5e1', tick: '#64748b' },
-  dark: { grid: '#243049', axis: '#334155', tick: '#94a3b8' },
+const AXIS_TOKENS: Record<
+  ThemeMode,
+  { grid: string; axis: string; tick: string; guide: string }
+> = {
+  light: { grid: '#e2e8f0', axis: '#cbd5e1', tick: '#64748b', guide: '#94a3b8' },
+  dark: { grid: '#243049', axis: '#334155', tick: '#94a3b8', guide: '#64748b' },
 };
 
 /** Trend direction colouring; for a score, up is good and down is not. */
@@ -39,6 +46,22 @@ function scoreTrendClass(trendPerWeek: number | null): string {
   if (trendPerWeek > 1) return 'score-trend-up';
   if (trendPerWeek < -1) return 'score-trend-down';
   return 'trend-flat';
+}
+
+/** One compact sentence listing what "every goal met" assumes, per metric. */
+function goalBasis(targets: GoalTargets): string {
+  const parts = [
+    `${formatMetric(targets.steps, 0)} ${METRIC_UNITS.steps} a day`,
+    `sleep ${formatMetric(targets.sleepQuality, 1)}${METRIC_UNITS.sleep}`,
+    `activity ${formatMetric(targets.activityRating, 1)}${METRIC_UNITS.activity}`,
+  ];
+  if (targets.weightKg !== null) {
+    parts.push(`${formatMetric(targets.weightKg, 1)} ${METRIC_UNITS.weight} weight`);
+  }
+  if (targets.calories !== null) {
+    parts.push(`${formatMetric(targets.calories, 0)} ${METRIC_UNITS.calories} a day`);
+  }
+  return parts.join(', ');
 }
 
 interface ChartRow extends ScoreTimelinePoint {
@@ -50,7 +73,15 @@ interface TooltipEntry {
   payload?: ChartRow;
 }
 
-function ScoreTooltip({ active, payload }: { active?: boolean; payload?: TooltipEntry[] }) {
+function ScoreTooltip({
+  active,
+  payload,
+  goal,
+}: {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  goal?: GoalHealthScore;
+}) {
   const row = payload?.[0]?.payload;
   if (!active || !row) return null;
   return (
@@ -61,6 +92,12 @@ function ScoreTooltip({ active, payload }: { active?: boolean; payload?: Tooltip
           <span>Health score</span>
           <strong>{row.score === null ? '—' : `${row.score}/100`}</strong>
         </li>
+        {goal !== undefined && goal.score !== null ? (
+          <li className="chart-tooltip__goal">
+            <span>Goal</span>
+            <strong>{formatMetric(goal.score, 0)}/100</strong>
+          </li>
+        ) : null}
       </ul>
     </div>
   );
@@ -68,6 +105,7 @@ function ScoreTooltip({ active, payload }: { active?: boolean; payload?: Tooltip
 
 function HealthScoreChartBase({
   timeline,
+  goal,
   height = 260,
   theme = 'light',
 }: HealthScoreChartProps) {
@@ -79,6 +117,7 @@ function HealthScoreChartBase({
     [timeline.points],
   );
   const scoredDays = timeline.points.filter((point) => point.score !== null).length;
+  const goalScoreValue = goal === undefined ? null : goal.score;
 
   return (
     <section className="card chart-card" aria-labelledby="health-score-chart">
@@ -108,6 +147,12 @@ function HealthScoreChartBase({
               {formatSigned(timeline.trendPerWeek, 1)}
             </dd>
           </div>
+          {goalScoreValue !== null ? (
+            <div>
+              <dt>Goal</dt>
+              <dd>{formatMetric(goalScoreValue, 0)}</dd>
+            </div>
+          ) : null}
         </dl>
       </header>
 
@@ -131,7 +176,22 @@ function HealthScoreChartBase({
                 width={56}
                 tickFormatter={(value: number) => formatMetric(value, 0)}
               />
-              <Tooltip content={<ScoreTooltip />} isAnimationActive={false} />
+              {/* Always inside the fixed 0-100 domain, so no anchor padding
+                  is needed here. */}
+              {goalScoreValue !== null ? (
+                <ReferenceLine
+                  y={goalScoreValue}
+                  stroke={tokens.guide}
+                  strokeDasharray="4 4"
+                  label={{
+                    value: 'Goal',
+                    position: 'insideTopRight',
+                    fontSize: 11,
+                    fill: tokens.tick,
+                  }}
+                />
+              ) : null}
+              <Tooltip content={<ScoreTooltip goal={goal} />} isAnimationActive={false} />
               <Line
                 type="monotone"
                 dataKey="score"
@@ -152,6 +212,24 @@ function HealthScoreChartBase({
           timeline appears here.
         </p>
       )}
+
+      {goal !== undefined && goalScoreValue !== null ? (
+        <div className="chart-goal-note">
+          <p>
+            The goal line is the score if every goal were met: {goalBasis(goal.targets)}.
+          </p>
+          {goal.limiting.length > 0 ? (
+            <>
+              <p>It sits below 100 because:</p>
+              <ul className="chart-goal-note__list">
+                {goal.limiting.map((insight) => (
+                  <li key={insight.id}>{insight.summary}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -13,6 +13,7 @@ import { ThemeToggle } from '../components/ThemeToggle.tsx';
 import { TimeSeriesChart } from '../components/TimeSeriesChart.tsx';
 import { analyzeHealth, scoreTimeline } from '../lib/insights.ts';
 import { buildChartData } from '../lib/charts.ts';
+import type { GoalHealthScore } from '../lib/goalscore.ts';
 import { countMoods } from '../lib/moods.ts';
 import { DEFAULT_PROFILE } from '../types.ts';
 import type { DailyEntry, Insight, Profile } from '../types.ts';
@@ -978,6 +979,58 @@ describe('HealthScoreChart', () => {
 
     expect(screen.getByRole('heading', { name: 'Health score' })).toBeInTheDocument();
     expect(container.querySelector('.recharts-line')).not.toBeNull();
+  });
+
+  it('draws the goal line and explains a goal score below 100', () => {
+    const goal: GoalHealthScore = {
+      score: 91,
+      targets: {
+        weightKg: 75,
+        steps: 8000,
+        sleepQuality: 4,
+        activityRating: 3,
+        calories: 2682,
+      },
+      limiting: [
+        {
+          id: 'body.bmi',
+          category: 'body',
+          severity: 'warning',
+          title: 'BMI is in the underweight range',
+          summary: 'A BMI of 15.4 is below the healthy range of 18.5 to 24.9.',
+          evidence: ['Height 180 cm', 'Weight 50 kg'],
+          recommendations: [
+            { title: 'Revisit the target weight', detail: 'Aim inside the healthy band.' },
+          ],
+        },
+      ],
+    };
+    const { container } = render(<HealthScoreChart timeline={timeline} goal={goal} />);
+
+    expect(screen.getByText('Goal', { selector: 'dt' })).toBeInTheDocument();
+    expect(screen.getByText('91')).toBeInTheDocument();
+    expect(container.querySelector('.recharts-reference-line')).not.toBeNull();
+    expect(screen.getByText(/if every goal were met/i)).toBeInTheDocument();
+    expect(screen.getByText(/below the healthy range/i)).toBeInTheDocument();
+  });
+
+  it('omits the goal line when the goal score cannot be computed', () => {
+    const goal: GoalHealthScore = {
+      score: null,
+      targets: {
+        weightKg: null,
+        steps: 8000,
+        sleepQuality: 4,
+        activityRating: 3,
+        calories: null,
+      },
+      limiting: [],
+    };
+    const { container } = render(<HealthScoreChart timeline={timeline} goal={goal} />);
+
+    expect(screen.queryByText('Goal', { selector: 'dt' })).toBeNull();
+    expect(container.querySelector('.recharts-reference-line')).toBeNull();
+    expect(container.querySelector('.chart-goal-note')).toBeNull();
   });
 
   it('shows an empty state when no day could be scored', () => {
