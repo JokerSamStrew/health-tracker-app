@@ -18,8 +18,10 @@ goal-tracking analysis.
 - **Bulk entry** — switch the entry form to a custom date range and one set of
   values is applied to every day between the two dates, or save a single exact
   date as before.
-- **Five timelines** — Recharts line charts with a 7-day rolling average, the
-  latest/average/trend stats, and a dashed goal line for any goal you set.
+- **Timelines** — Recharts line charts for all five metrics with a 7-day rolling
+  average, the latest/average/trend stats, and a dashed goal line for any goal
+  you set, plus a rolling health-score timeline showing how the 0–100 score
+  evolved day by day.
 - **Mood tags** — tag any day with one or more moods from a grouped palette,
   and a pie chart above the timelines shows how often each tag was logged in
   the selected window.
@@ -110,6 +112,11 @@ testable.
   `src/lib/insights.ts` — tune behaviour there, not by editing rule bodies.
 - Insights carry the numbers behind them in `evidence`, which the UI renders so
   a claim can be checked rather than trusted.
+- `scoreTimeline(entries, profile, { referenceDate, windowDays, spanDays })`
+  replays that analysis for every day of a span — each day is scored as a
+  report ending on it would have been — which is what the health-score
+  timeline charts. Days before the minimum data threshold are `null`, so the
+  chart's gaps mean "not enough data yet".
 
 The rules cover: insufficient data, logging coverage, missing metrics, BMI,
 weight trend and pace, distance to target weight, the projected arrival date
@@ -138,7 +145,7 @@ intake-vs-weight agreement.
 pnpm test
 ```
 
-439 tests across 14 files, mirroring the `lib/` modules one-to-one, plus component,
+451 tests across 14 files, mirroring the `lib/` modules one-to-one, plus component,
 hook and app-shell tests. Notable techniques:
 
 - Determinism: analysis tests always pass an explicit `referenceDate`, so no

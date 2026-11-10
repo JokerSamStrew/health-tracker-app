@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { EntryForm } from './components/EntryForm.tsx';
 import { BackupPanel } from './components/BackupPanel.tsx';
+import { HealthScoreChart } from './components/HealthScoreChart.tsx';
 import { HistoryTable } from './components/HistoryTable.tsx';
 import { InsightsPanel } from './components/InsightsPanel.tsx';
 import { MoodChart } from './components/MoodChart.tsx';
@@ -12,7 +13,7 @@ import { useHealthData } from './hooks/useHealthData.ts';
 import { useTheme } from './hooks/useTheme.ts';
 import { buildChartData } from './lib/charts.ts';
 import { formatShortDate } from './lib/date.ts';
-import { DEFAULT_WINDOW_DAYS } from './lib/insights.ts';
+import { DEFAULT_WINDOW_DAYS, scoreTimeline } from './lib/insights.ts';
 import { countMoods } from './lib/moods.ts';
 import type { DailyEntry, Profile } from './types.ts';
 
@@ -82,6 +83,17 @@ export default function App() {
   const chartData = useMemo(
     () => buildChartData(entries, today, Math.max(windowDays, 14)),
     [entries, today, windowDays],
+  );
+
+  // Scored over the same span as the metric charts so the x-axes line up; each
+  // day is scored as a report ending on that day would have been.
+  const scoreTimelineData = useMemo(
+    () => scoreTimeline(entries, profile, {
+      referenceDate: today,
+      windowDays,
+      spanDays: Math.max(windowDays, 14),
+    }),
+    [entries, profile, today, windowDays],
   );
 
   const moodCounts = useMemo(
@@ -167,6 +179,7 @@ export default function App() {
             </p>
           </div>
           <div className="charts__grid">
+            <HealthScoreChart timeline={scoreTimelineData} theme={theme} />
             <TimeSeriesChart
               title="Weight"
               metric="weight"

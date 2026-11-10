@@ -4,6 +4,7 @@ import {
   correlationBetween,
   daysWithData,
   latestWeight,
+  scoreTimeline,
   THRESHOLDS,
 } from '../lib/insights.ts';
 import { addDays } from '../lib/date.ts';
@@ -749,6 +750,92 @@ describe('determinism', () => {
     const first = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
     const second = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
     expect(first).toEqual(second);
+  });
+});
+
+describe('scoreTimeline', () => {
+  it('ends on the same score the report shows', () => {
+    const entries = makeSeries(14, () => ({
+      weightKg: 80,
+      steps: 10000,
+      sleepQuality: 4,
+      calories: 2650,
+    }));
+    const options = { referenceDate: REFERENCE, windowDays: 14 } as const;
+    const timeline = scoreTimeline(entries, BASE_PROFILE, options);
+    expect(timeline.current).toBe(analyzeHealth(entries, BASE_PROFILE, options).score);
+  });
+
+  it('spans exactly the requested days ending on the reference date', () => {
+    const timeline = scoreTimeline([], BASE_PROFILE, { referenceDate: REFERENCE, spanDays: 7 });
+    expect(timeline.points).toHaveLength(7);
+    expect(timeline.points[0]!.date).toBe('2024-03-08');
+    expect(timeline.points.at(-1)!.date).toBe(REFERENCE);
+  });
+
+  it('defaults the span to the window length', () => {
+    const timeline = scoreTimeline([], BASE_PROFILE, { referenceDate: REFERENCE, windowDays: 10 });
+    expect(timeline.points).toHaveLength(10);
+    expect(timeline.windowDays).toBe(10);
+  });
+
+  it('leaves days null until the minimum data threshold is met', () => {
+    // 14 entries ending on the reference date, so the first points of the
+    // timeline see 1 and 2 logged days in their trailing window - below
+    // MIN_DAYS_FOR_INSIGHTS - while the third already sees 3.
+    const entries = makeSeries(14, () => ({
+      weightKg: 80,
+      steps: 9000,
+      sleepQuality: 4,
+      calories: 2400,
+    }));
+    const timeline = scoreTimeline(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    expect(timeline.points[0]!.score).toBeNull();
+    expect(timeline.points[1]!.score).toBeNull();
+    expect(timeline.points[2]!.score).not.toBeNull();
+  });
+
+  it('drops as the log worsens, with a negative trend', () => {
+    // First 7 days are on target, the last 7 degrade hard, so the score
+    // measured at the end must be lower than the one measured early on.
+    const entries = makeSeries(14, (i) =>
+      i < 7
+        ? { weightKg: 80, steps: 10000, sleepQuality: 4, calories: 2650 }
+        : { weightKg: 80, steps: 1500, sleepQuality: 2, calories: 600 },
+    );
+    const timeline = scoreTimeline(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    const early = timeline.points[3]!.score;
+    expect(early).not.toBeNull();
+    expect(timeline.current).not.toBeNull();
+    expect(timeline.current!).toBeLessThan(early!);
+    expect(timeline.trendPerWeek).not.toBeNull();
+    expect(timeline.trendPerWeek!).toBeLessThan(0);
+    expect(timeline.average).not.toBeNull();
+  });
+
+  it('is all null with no entries', () => {
+    const timeline = scoreTimeline([], BASE_PROFILE, { referenceDate: REFERENCE });
+    expect(timeline.current).toBeNull();
+    expect(timeline.average).toBeNull();
+    expect(timeline.trendPerWeek).toBeNull();
+    expect(timeline.points.every((point) => point.score === null)).toBe(true);
+  });
+
+  it('needs two scored days before a trend exists', () => {
+    // Only the reference date itself clears the 3-day minimum, so there is a
+    // single scored point and no line to fit through.
+    const entries = makeSeries(3, () => ({ steps: 9000, sleepQuality: 4 }));
+    const timeline = scoreTimeline(entries, {}, { referenceDate: REFERENCE });
+    expect(timeline.current).not.toBeNull();
+    expect(timeline.trendPerWeek).toBeNull();
+  });
+
+  it('ignores entries logged after the day being scored', () => {
+    // The mid-window point must not peek at the reference-date entry.
+    const entries = makeSeries(14, () => ({ steps: 9000 }));
+    const timeline = scoreTimeline(entries, {}, { referenceDate: REFERENCE, spanDays: 14 });
+    const mid = timeline.points[7]!.score;
+    expect(mid).toBe(analyzeHealth(entries, {}, { referenceDate: '2024-03-08' }).score);
   });
 });
 

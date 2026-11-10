@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { BackupPanel } from '../components/BackupPanel.tsx';
 import { EntryForm, formToEntries, formToEntry } from '../components/EntryForm.tsx';
+import { HealthScoreChart } from '../components/HealthScoreChart.tsx';
 import { HistoryTable } from '../components/HistoryTable.tsx';
 import { InsightsPanel } from '../components/InsightsPanel.tsx';
 import { MoodChart } from '../components/MoodChart.tsx';
@@ -10,7 +11,7 @@ import { SummaryCards } from '../components/SummaryCards.tsx';
 import { ProfilePanel } from '../components/ProfilePanel.tsx';
 import { ThemeToggle } from '../components/ThemeToggle.tsx';
 import { TimeSeriesChart } from '../components/TimeSeriesChart.tsx';
-import { analyzeHealth } from '../lib/insights.ts';
+import { analyzeHealth, scoreTimeline } from '../lib/insights.ts';
 import { buildChartData } from '../lib/charts.ts';
 import { countMoods } from '../lib/moods.ts';
 import { DEFAULT_PROFILE } from '../types.ts';
@@ -911,6 +912,79 @@ describe('TimeSeriesChart', () => {
     );
 
     expect(screen.getByText(/log sleep for at least one day/i)).toBeInTheDocument();
+    expect(container.querySelector('.recharts-wrapper')).toBeNull();
+  });
+});
+
+describe('HealthScoreChart', () => {
+  const entries = makeEntries(14);
+  const timeline = scoreTimeline(entries, DEFAULT_PROFILE, {
+    referenceDate: REFERENCE,
+    windowDays: 14,
+  });
+
+  // Recharts measures its container, and jsdom always reports 0x0, so the
+  // chart would silently render nothing without these stubs.
+  beforeAll(() => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      width: 800,
+      height: 260,
+      top: 0,
+      right: 800,
+      bottom: 260,
+      left: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private readonly callback: ResizeObserverCallback) {}
+        observe(target: Element): void {
+          const rect = { width: 800, height: 260 } as DOMRectReadOnly;
+          this.callback([{ target, contentRect: rect } as ResizeObserverEntry], this as never);
+        }
+        unobserve(): void {}
+        disconnect(): void {}
+      },
+    );
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('renders the header stats', () => {
+    render(<HealthScoreChart timeline={timeline} />);
+
+    expect(screen.getByRole('heading', { name: 'Health score' })).toBeInTheDocument();
+    expect(screen.getByText('Current')).toBeInTheDocument();
+    expect(screen.getByText('Average')).toBeInTheDocument();
+    expect(screen.getByText('Trend/wk')).toBeInTheDocument();
+    expect(screen.getByText(/days scored/i)).toBeInTheDocument();
+  });
+
+  it('draws the chart when days are scored', () => {
+    const { container } = render(<HealthScoreChart timeline={timeline} />);
+
+    expect(container.querySelector('.recharts-wrapper')).not.toBeNull();
+    expect(container.querySelector('.recharts-line')).not.toBeNull();
+  });
+
+  it('renders with the dark theme palette', () => {
+    const { container } = render(<HealthScoreChart timeline={timeline} theme="dark" />);
+
+    expect(screen.getByRole('heading', { name: 'Health score' })).toBeInTheDocument();
+    expect(container.querySelector('.recharts-line')).not.toBeNull();
+  });
+
+  it('shows an empty state when no day could be scored', () => {
+    const empty = scoreTimeline([], DEFAULT_PROFILE, { referenceDate: REFERENCE });
+    const { container } = render(<HealthScoreChart timeline={empty} />);
+
+    expect(screen.getByText(/not enough days logged/i)).toBeInTheDocument();
     expect(container.querySelector('.recharts-wrapper')).toBeNull();
   });
 });

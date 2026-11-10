@@ -64,7 +64,8 @@ src/lib/stats.ts    mean/median/stdDev, moving average, least-squares
                     regression, Pearson correlation, number formatting.
 src/lib/health.ts   BMI, BMR (Mifflin-St Jeor), TDEE, calorie target for goal.
 src/lib/series.ts   Entries -> sorted/merged series + per-metric summaries.
-src/lib/insights.ts analyzeHealth() and the 18 rules. THRESHOLDS lives here.
+src/lib/insights.ts analyzeHealth() and the 18 rules, plus scoreTimeline()
+                    for the rolling health-score chart. THRESHOLDS lives here.
 src/lib/forecast.ts Weight-goal projection: days to the target and the
                     arrival date, from the window's weight trend.
 src/lib/charts.ts   Recharts-shaped points, null gaps, padded axis domains.
@@ -85,7 +86,9 @@ localStorage
   -> useHealthData state         (React owns it after mount)
   -> analyzeHealth(entries, profile, { referenceDate, windowDays })
   -> HealthReport { summaries, score, insights, counts }
-  -> SummaryCards / TimeSeriesChart / InsightsPanel
+  -> scoreTimeline(entries, profile, { ... , spanDays })   (replays the
+     analysis per day for the health-score chart; App memoizes it)
+  -> SummaryCards / TimeSeriesChart / HealthScoreChart / InsightsPanel
 ```
 
 `report` is a `useMemo` over `[entries, profile, referenceDate, windowDays]`.

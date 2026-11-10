@@ -537,6 +537,10 @@ input:focus-visible {
 .trend-down { color: var(--info); }
 .trend-flat { color: var(--text-faint); }
 
+/* The health score flips the reading: rising is good, falling is not. */
+.score-trend-up { color: var(--positive); }
+.score-trend-down { color: var(--critical); }
+
 /* -------------------------------------------------------------------------- */
 /* charts                                                                    */
 /* -------------------------------------------------------------------------- */

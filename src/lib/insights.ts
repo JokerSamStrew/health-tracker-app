@@ -23,7 +23,7 @@ import {
   dailyCalorieDeltaForWeightChange,
   SAFE_PACE_KG_PER_WEEK,
 } from './health.ts';
-import { addDays, ageFromBirthDate, formatLongDate, formatShortDate, toISODate } from './date.ts';
+import { addDays, ageFromBirthDate, formatLongDate, formatShortDate, lastNDays, toISODate } from './date.ts';
 import { FORECAST_LIMITS, forecastWeightGoal, lastWeighInDate } from './forecast.ts';
 import {
   METRIC_DIGITS,
@@ -35,6 +35,8 @@ import {
   clamp,
   formatMetric,
   formatNumber,
+  linearRegression,
+  mean,
   pearsonCorrelation,
   round,
   variationRatio,
@@ -1478,6 +1480,79 @@ export function analyzeHealth(
     score,
     insights: sorted,
     counts,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// rolling health score
+// ---------------------------------------------------------------------------
+
+/** One day of the rolling health-score timeline. */
+export interface ScoreTimelinePoint {
+  /** ISO date the score is "as of". */
+  date: string;
+  /** Score a report ending on this date would show, or `null` when the
+   * trailing window did not have enough data yet. */
+  score: number | null;
+}
+
+/** The health score plotted over time, plus headline statistics. */
+export interface ScoreTimeline {
+  /** One point per calendar day of the span, ascending. */
+  points: ScoreTimelinePoint[];
+  /** Score as of `referenceDate`; identical to `analyzeHealth(...).score`. */
+  current: number | null;
+  /** Mean of the scored days, or `null` when none were scored. */
+  average: number | null;
+  /** Least-squares score change per week, or `null` below two scored days. */
+  trendPerWeek: number | null;
+  /** Length of the trailing window each point was scored over. */
+  windowDays: number;
+}
+
+export interface ScoreTimelineOptions extends AnalyzeOptions {
+  /** Days the timeline spans, ending at `referenceDate`. Defaults to `windowDays`. */
+  spanDays?: number;
+}
+
+/**
+ * The health score over time: one point per day, each scored as a report
+ * ending on that day with the same trailing window length would be.
+ *
+ * Two properties follow from that definition and are worth keeping: the last
+ * point is always identical to the current report's score, and days before
+ * the minimum data threshold are `null` - so the chart's gaps mean "not
+ * enough data yet", exactly like the metric timelines.
+ */
+export function scoreTimeline(
+  entries: readonly DailyEntry[],
+  profile: Profile = {},
+  options: ScoreTimelineOptions = {},
+): ScoreTimeline {
+  const referenceDate = options.referenceDate ?? toISODate(new Date());
+  const windowDays = Math.max(1, options.windowDays ?? DEFAULT_WINDOW_DAYS);
+  const spanDays = Math.max(1, options.spanDays ?? windowDays);
+
+  const points: ScoreTimelinePoint[] = lastNDays(referenceDate, spanDays).map((date) => ({
+    date,
+    score: analyzeHealth(entries, profile, { referenceDate: date, windowDays }).score,
+  }));
+
+  const current = points.length > 0 ? points[points.length - 1]!.score : null;
+  const scored = points
+    .map((point, index) => ({ x: index, y: point.score }))
+    .filter((point): point is { x: number; y: number } => point.y !== null);
+
+  // The points are one per consecutive day, so x is already in days and the
+  // slope scales to a week the same way `summarizeMetric` scales its trend.
+  const regression = scored.length >= 2 ? linearRegression(scored) : null;
+
+  return {
+    points,
+    current,
+    average: mean(scored.map((point) => point.y)),
+    trendPerWeek: regression ? regression.slope * 7 : null,
+    windowDays,
   };
 }
 
