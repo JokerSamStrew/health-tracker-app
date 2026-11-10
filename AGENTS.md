@@ -64,7 +64,9 @@ src/lib/stats.ts    mean/median/stdDev, moving average, least-squares
                     regression, Pearson correlation, number formatting.
 src/lib/health.ts   BMI, BMR (Mifflin-St Jeor), TDEE, calorie target for goal.
 src/lib/series.ts   Entries -> sorted/merged series + per-metric summaries.
-src/lib/insights.ts analyzeHealth() and the 17 rules. THRESHOLDS lives here.
+src/lib/insights.ts analyzeHealth() and the 18 rules. THRESHOLDS lives here.
+src/lib/forecast.ts Weight-goal projection: days to the target and the
+                    arrival date, from the window's weight trend.
 src/lib/charts.ts   Recharts-shaped points, null gaps, padded axis domains.
 src/lib/moods.ts    Mood-tag catalog, normalisation, window counts.
 src/lib/storage.ts  localStorage read/write, sanitizing, memory fake.
@@ -135,6 +137,7 @@ failures.
 | `SAFE_PACE_KG_PER_WEEK` | 0.45 kg/wk = 495 kcal/day |
 | Default step goal / sleep quality goal / activity goal | 8000 steps / 4 (out of 5) / 3 (out of 5) |
 | `MIN_DAYS_FOR_INSIGHTS` / `MIN_DAYS_FOR_TREND` | 3 / 5 |
+| `FORECAST_LIMITS.minTrendKgPerWeek` / `.maxHorizonDays` | 0.05 kg/wk / 730 days |
 | Health score | `100 - 18*critical - 9*warning`, clamped 0–100, `null` below the minimum |
 
 Activity multipliers: sedentary 1.2, light 1.375, moderate 1.55, active 1.725,

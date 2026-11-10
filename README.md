@@ -23,7 +23,7 @@ goal-tracking analysis.
 - **Mood tags** — tag any day with one or more moods from a grouped palette,
   and a pie chart above the timelines shows how often each tag was logged in
   the selected window.
-- **Insight engine** — 17 rules across data quality, body composition, weight,
+- **Insight engine** — 18 rules across data quality, body composition, weight,
   recovery, activity and energy. Each insight shows the numbers it used
   (`evidence`) and what to do about it (`recommendations`).
 - **Cross-metric analysis** — e.g. poor sleep alongside a rising weight, or
@@ -82,6 +82,7 @@ src/
     health.ts            BMI, BMR (Mifflin-St Jeor), TDEE, calorie targets
     series.ts            Entries -> ordered series and per-metric summaries
     insights.ts          The rule engine: analyzeHealth() + THRESHOLDS
+    forecast.ts          Weight-goal projection: days to target + arrival date
     charts.ts            Recharts-shaped data, gaps as null, axis domains
     moods.ts             Mood-tag catalog, normalisation and window counts
     storage.ts           localStorage read/write with defensive sanitizing
@@ -111,10 +112,11 @@ testable.
   a claim can be checked rather than trusted.
 
 The rules cover: insufficient data, logging coverage, missing metrics, BMI,
-weight trend and pace, distance to target weight, sleep quality and
-consistency, sleep-vs-weight interaction, step volume and trend, activity
-rating versus goal, activity consistency, activity-versus-steps agreement,
-calorie balance, calorie stability, and intake-vs-weight agreement.
+weight trend and pace, distance to target weight, the projected arrival date
+at that target, sleep quality and consistency, sleep-vs-weight interaction,
+step volume and trend, activity rating versus goal, activity consistency,
+activity-versus-steps agreement, calorie balance, calorie stability, and
+intake-vs-weight agreement.
 
 ## Data and privacy
 
@@ -136,7 +138,7 @@ calorie balance, calorie stability, and intake-vs-weight agreement.
 pnpm test
 ```
 
-418 tests across 13 files, mirroring the `lib/` modules one-to-one, plus component,
+439 tests across 14 files, mirroring the `lib/` modules one-to-one, plus component,
 hook and app-shell tests. Notable techniques:
 
 - Determinism: analysis tests always pass an explicit `referenceDate`, so no

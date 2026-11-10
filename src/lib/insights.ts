@@ -23,7 +23,8 @@ import {
   dailyCalorieDeltaForWeightChange,
   SAFE_PACE_KG_PER_WEEK,
 } from './health.ts';
-import { addDays, ageFromBirthDate, toISODate } from './date.ts';
+import { addDays, ageFromBirthDate, formatLongDate, formatShortDate, toISODate } from './date.ts';
+import { FORECAST_LIMITS, forecastWeightGoal, lastWeighInDate } from './forecast.ts';
 import {
   METRIC_DIGITS,
   METRIC_FIELD,
@@ -33,6 +34,7 @@ import {
 import {
   clamp,
   formatMetric,
+  formatNumber,
   pearsonCorrelation,
   round,
   variationRatio,
@@ -581,6 +583,67 @@ function ruleWeightGoal(
       ? `You need ${formatKg(gap)} kg more to reach your target.`
       : `You are ${formatKg(Math.abs(gap))} kg over your target.`,
     evidence,
+    recommendations,
+  );
+}
+
+/**
+ * Projected arrival at the target weight: how many days and on which date,
+ * assuming the current trend continues.
+ */
+function ruleWeightForecast(
+  profile: Profile,
+  summaries: Record<MetricKey, MetricSummary>,
+  windowEntries: readonly DailyEntry[],
+  referenceDate: string,
+): Insight | null {
+  const target = profile.targetWeightKg;
+  const latest = latestWeight(summaries);
+  if (target === undefined || !Number.isFinite(target) || latest === null) return null;
+
+  const gap = target - latest;
+  // Within the tolerance the goal rule already reports success, so a forecast
+  // would only argue with it.
+  if (Math.abs(gap) <= THRESHOLDS.weightGoalToleranceKg) return null;
+
+  // The countdown starts at the last weigh-in - where the trend line is
+  // anchored - which is not necessarily the reference date.
+  const anchorDate = lastWeighInDate(windowEntries) ?? referenceDate;
+  const forecast = forecastWeightGoal(profile, summaries, anchorDate);
+  if (forecast === null) return null;
+
+  const { daysToGoal, projectedDate, trendKgPerWeek, gapKg } = forecast;
+  const pace = Math.abs(trendKgPerWeek);
+  const weeks = round(daysToGoal / 7, 0);
+  const daysAtSafePace = Math.ceil((Math.abs(gapKg) / SAFE_PACE_KG_PER_WEEK) * 7 - 1e-6);
+
+  const recommendations: Recommendation[] = [
+    {
+      title: 'Treat the date as a projection, not a promise',
+      detail:
+        'It extends the trend of your recent weigh-ins in a straight line. A plateau, an illness or a holiday moves it, so re-check as you log.',
+    },
+  ];
+  if (daysAtSafePace <= FORECAST_LIMITS.maxHorizonDays) {
+    recommendations.push({
+      title: 'Compare with the usual safe pace',
+      detail: `At ${SAFE_PACE_KG_PER_WEEK} kg per week the same gap takes about ${formatNumber(daysAtSafePace)} days, and a change that size is far easier to sustain.`,
+    });
+  }
+
+  return buildInsight(
+    'weight.forecast',
+    'weight',
+    'info',
+    `Target in ${formatNumber(daysToGoal)} days`,
+    `At your current pace of ${fmt('weight', pace)} kg per week you would reach ${fmt('weight', target)} kg in ${formatNumber(daysToGoal)} days${daysToGoal >= 21 ? ` (about ${formatNumber(weeks)} weeks)` : ''}, on ${formatLongDate(projectedDate)}.`,
+    [
+      `Trend ${trendKgPerWeek > 0 ? '+' : ''}${fmt('weight', trendKgPerWeek)} kg per week`,
+      `Current ${fmt('weight', latest)} kg (last weigh-in ${formatShortDate(anchorDate)})`,
+      `Target ${fmt('weight', target)} kg`,
+      `Gap ${gapKg > 0 ? '+' : ''}${fmt('weight', gapKg)} kg`,
+      `Arrival ${formatLongDate(projectedDate)} - ${formatNumber(daysToGoal)} days from ${formatShortDate(anchorDate)}`,
+    ],
     recommendations,
   );
 }
@@ -1381,6 +1444,7 @@ export function analyzeHealth(
   add(ruleBmi(profile, summaries));
   add(ruleWeightTrend(summaries));
   add(ruleWeightGoal(profile, summaries, age));
+  add(ruleWeightForecast(profile, summaries, windowEntries, referenceDate));
   add(ruleSleepAverage(profile, summaries));
   add(ruleSleepRegularity(summaries));
   add(ruleSleepWeightInteraction(summaries));

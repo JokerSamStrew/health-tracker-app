@@ -304,6 +304,86 @@ describe('weight goal rule', () => {
   });
 });
 
+describe('weight forecast rule', () => {
+  it('projects the days and the arrival date from the current trend', () => {
+    // -0.1 kg/day = -0.7 kg/week; the latest weigh-in is 78.7 kg, so the 75 kg
+    // target is 3.7 kg away: 3.7 / 0.7 * 7 = 37 days from Mar 14.
+    const entries = makeSeries(14, (i) => ({ weightKg: 80 - i * 0.1 }));
+    const report = analyzeHealth(
+      entries,
+      { ...BASE_PROFILE, targetWeightKg: 75 },
+      { referenceDate: REFERENCE },
+    );
+    const insight = insightById(report.insights, 'weight.forecast');
+    expect(insight.severity).toBe('info');
+    expect(insight.title).toBe('Target in 37 days');
+    expect(insight.summary).toContain('Apr 20, 2024');
+    expect(insight.evidence.some((item) => item.includes('37 days'))).toBe(true);
+  });
+
+  it('compares the projection with the safe pace', () => {
+    // The same 3.7 kg gap at the 0.45 kg/week safe pace is about 58 days.
+    const entries = makeSeries(14, (i) => ({ weightKg: 80 - i * 0.1 }));
+    const report = analyzeHealth(
+      entries,
+      { ...BASE_PROFILE, targetWeightKg: 75 },
+      { referenceDate: REFERENCE },
+    );
+    const insight = insightById(report.insights, 'weight.forecast');
+    expect(insight.recommendations.some((r) => r.detail.includes('58 days'))).toBe(true);
+  });
+
+  it('does not fire without a target weight', () => {
+    const entries = makeSeries(14, (i) => ({ weightKg: 80 - i * 0.1 }));
+    const report = analyzeHealth(entries, BASE_PROFILE, { referenceDate: REFERENCE });
+    expect(report.insights.some((i) => i.id === 'weight.forecast')).toBe(false);
+  });
+
+  it('stays silent when the target is already reached', () => {
+    // 78.4 kg is 0.3 kg below the latest weigh-in, inside the 0.5 kg
+    // tolerance, so the goal rule reports success instead.
+    const entries = makeSeries(14, (i) => ({ weightKg: 80 - i * 0.1 }));
+    const report = analyzeHealth(
+      entries,
+      { ...BASE_PROFILE, targetWeightKg: 78.4 },
+      { referenceDate: REFERENCE },
+    );
+    expect(report.insights.some((i) => i.id === 'weight.forecast')).toBe(false);
+    expect(insightById(report.insights, 'weight.goal').severity).toBe('positive');
+  });
+
+  it('does not fire when the trend moves away from the target', () => {
+    // Losing weight while the target sits above: no arrival date exists.
+    const entries = makeSeries(14, (i) => ({ weightKg: 80 - i * 0.1 }));
+    const report = analyzeHealth(
+      entries,
+      { ...BASE_PROFILE, targetWeightKg: 85 },
+      { referenceDate: REFERENCE },
+    );
+    expect(report.insights.some((i) => i.id === 'weight.forecast')).toBe(false);
+  });
+
+  it('does not fire when the trend is flat', () => {
+    const entries = makeSeries(14, () => ({ weightKg: 80 }));
+    const report = analyzeHealth(
+      entries,
+      { ...BASE_PROFILE, targetWeightKg: 75 },
+      { referenceDate: REFERENCE },
+    );
+    expect(report.insights.some((i) => i.id === 'weight.forecast')).toBe(false);
+  });
+
+  it('does not fire below the trend data threshold', () => {
+    const entries = makeSeries(3, (i) => ({ weightKg: 80 - i * 0.2 }));
+    const report = analyzeHealth(
+      entries,
+      { ...BASE_PROFILE, targetWeightKg: 75 },
+      { referenceDate: REFERENCE },
+    );
+    expect(report.insights.some((i) => i.id === 'weight.forecast')).toBe(false);
+  });
+});
+
 describe('sleep rules', () => {
   it('is positive when the goal is met', () => {
     const entries = makeSeries(14, () => ({ sleepQuality: 4 }));
