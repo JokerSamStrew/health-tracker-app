@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/context.tsx';
 import type { ThemeMode } from '../types.ts';
 
 export interface ThemeToggleProps {
@@ -28,6 +29,7 @@ function SunIcon() {
 
 /** Button that flips between light and dark; the label names the target theme. */
 export function ThemeToggle({ theme, onToggle }: ThemeToggleProps) {
+  const { t } = useI18n();
   const dark = theme === 'dark';
   return (
     <button
@@ -35,10 +37,10 @@ export function ThemeToggle({ theme, onToggle }: ThemeToggleProps) {
       className="button button--ghost theme-toggle"
       onClick={onToggle}
       aria-pressed={dark}
-      aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+      aria-label={t(dark ? 'theme.switchToLight' : 'theme.switchToDark')}
     >
       {dark ? <SunIcon /> : <MoonIcon />}
-      <span>{dark ? 'Light' : 'Dark'}</span>
+      <span>{t(dark ? 'theme.light' : 'theme.dark')}</span>
     </button>
   );
 }

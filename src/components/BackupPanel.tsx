@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useI18n } from '../i18n/context.tsx';
 import { buildBackup, parseBackup, type ParsedBackup } from '../lib/backup.ts';
 import type { DailyEntry, Profile } from '../types.ts';
 
@@ -14,6 +15,7 @@ export interface BackupPanelProps {
 type ImportStatus = { kind: 'idle' | 'success' | 'error'; message: string };
 
 export function BackupPanel({ entries, profile, referenceDate, onImport }: BackupPanelProps) {
+  const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<ParsedBackup | null>(null);
   const [status, setStatus] = useState<ImportStatus>({ kind: 'idle', message: '' });
@@ -27,7 +29,7 @@ export function BackupPanel({ entries, profile, referenceDate, onImport }: Backu
     anchor.download = `health-tracker-backup-${referenceDate}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-    setStatus({ kind: 'success', message: `Exported ${entries.length} entries as JSON.` });
+    setStatus({ kind: 'success', message: t('backup.exported', { count: entries.length }) });
   }
 
   function handleImportFile(file: File): void {
@@ -40,13 +42,13 @@ export function BackupPanel({ entries, profile, referenceDate, onImport }: Backu
       const text = typeof reader.result === 'string' ? reader.result : '';
       const parsed = parseBackup(text);
       if (!parsed) {
-        setStatus({ kind: 'error', message: 'That file is not a valid Health Tracker backup.' });
+        setStatus({ kind: 'error', message: t('backup.invalid') });
         return;
       }
       setPending(parsed);
     };
     reader.onerror = () => {
-      setStatus({ kind: 'error', message: 'The file could not be read.' });
+      setStatus({ kind: 'error', message: t('backup.unreadable') });
     };
     reader.readAsText(file);
   }
@@ -54,53 +56,58 @@ export function BackupPanel({ entries, profile, referenceDate, onImport }: Backu
   function confirmImport(): void {
     if (!pending) return;
     onImport(pending.entries, pending.profile);
+    // The Russian sentence carries its own leading space; trim it so both
+    // locales get exactly one before the skipped-count sentence.
     const skipped =
-      pending.dropped > 0 ? ` ${pending.dropped} invalid entries were skipped.` : '';
+      pending.dropped > 0
+        ? ` ${t('backup.skipped', { count: pending.dropped }).trimStart()}`
+        : '';
     setStatus({
       kind: 'success',
-      message: `Imported ${pending.entries.length} entries.${skipped}`,
+      message: t('backup.imported', { count: pending.entries.length, skipped }),
     });
     setPending(null);
   }
 
   return (
-    <section className="card backup" aria-label="Backup">
-      <h3>Backup</h3>
-      <p className="backup__intro">
-        Export everything you have logged as a JSON file, and restore it later on this or another
-        device. Importing replaces your current data.
-      </p>
+    <section className="card backup" aria-label={t('backup.ariaLabel')}>
+      <h3>{t('backup.title')}</h3>
+      <p className="backup__intro">{t('backup.intro')}</p>
 
       {pending ? (
         <div className="backup__pending">
           <p>
-            The file contains {pending.entries.length} entries. Importing replaces{' '}
-            {entries.length === 0 ? 'your (empty) history' : `your ${entries.length} entries`} and
-            the profile — this cannot be undone.
+            {t('backup.pending', {
+              count: pending.entries.length,
+              existing:
+                entries.length === 0
+                  ? t('backup.pendingEmpty')
+                  : t('backup.pendingEntries', { count: entries.length }),
+            })}
           </p>
           <div className="backup__actions">
             <button type="button" className="button button--danger" onClick={confirmImport}>
-              Replace with this file
+              {t('backup.replace')}
             </button>
             <button type="button" className="button button--ghost" onClick={() => setPending(null)}>
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </div>
       ) : (
         <div className="backup__actions">
           <button type="button" className="button button--ghost" onClick={handleExport}>
-            Export all data (.json)
+            {t('backup.export')}
           </button>
           <button
             type="button"
             className="button button--ghost"
             onClick={() => inputRef.current?.click()}
           >
-            Import from file
+            {t('backup.import')}
           </button>
           <label className="sr-only" htmlFor="backup-file-input">
-            Backup file
+            {t('backup.fileLabel')}
           </label>
           <input
             id="backup-file-input"

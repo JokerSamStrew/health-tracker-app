@@ -2,8 +2,14 @@
  * Small, dependency-free statistics helpers.
  *
  * Everything here is pure and tolerant of empty/short input so the insight
- * engine can call it without guarding every call site.
+ * engine can call it without guarding every call site. Number rendering takes
+ * an explicit locale (default English) so the same data reads naturally in
+ * every UI language without this module touching a global.
  */
+
+import type { Locale } from '../types.ts';
+
+const LOCALE_TAG: Record<Locale, string> = { en: 'en-US', ru: 'ru-RU' };
 
 export function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
@@ -183,23 +189,31 @@ export function round(value: number, digits = 1): number {
   return rounded === 0 ? 0 : rounded;
 }
 
-/** `12345` -> `"12,345"`. */
-export function formatNumber(value: number, digits = 0): string {
-  return value.toLocaleString('en-US', {
+/** `12345` -> `"12,345"` (en) or `"12 345"` (ru). */
+export function formatNumber(value: number, digits = 0, locale: Locale = 'en'): string {
+  return value.toLocaleString(LOCALE_TAG[locale], {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
 }
 
 /** Rounds to a fixed number of decimals and renders with thousands separators. */
-export function formatMetric(value: number | null | undefined, digits = 1): string {
+export function formatMetric(
+  value: number | null | undefined,
+  digits = 1,
+  locale: Locale = 'en',
+): string {
   if (!isFiniteNumber(value)) return '—';
-  return formatNumber(round(value, digits), digits);
+  return formatNumber(round(value, digits), digits, locale);
 }
 
-export function formatSigned(value: number | null | undefined, digits = 1): string {
+export function formatSigned(
+  value: number | null | undefined,
+  digits = 1,
+  locale: Locale = 'en',
+): string {
   if (!isFiniteNumber(value)) return '—';
   const rounded = round(value, digits);
   const sign = rounded > 0 ? '+' : '';
-  return `${sign}${formatNumber(rounded, digits)}`;
+  return `${sign}${formatNumber(rounded, digits, locale)}`;
 }

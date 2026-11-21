@@ -1,3 +1,5 @@
+import { useI18n } from '../i18n/context.tsx';
+import type { TranslationKey } from '../i18n/strings.ts';
 import type { Insight, Severity } from '../types.ts';
 
 export interface InsightsPanelProps {
@@ -6,11 +8,11 @@ export interface InsightsPanelProps {
   showPositive?: boolean;
 }
 
-const SEVERITY_LABEL: Record<Severity, string> = {
-  critical: 'Critical',
-  warning: 'Warning',
-  info: 'Note',
-  positive: 'Good',
+const SEVERITY_LABEL: Record<Severity, TranslationKey> = {
+  critical: 'insight.severity.critical',
+  warning: 'insight.severity.warning',
+  info: 'insight.severity.info',
+  positive: 'insight.severity.positive',
 };
 
 const SEVERITY_ICON: Record<Severity, string> = {
@@ -21,12 +23,13 @@ const SEVERITY_ICON: Record<Severity, string> = {
 };
 
 function InsightCard({ insight }: { insight: Insight }) {
+  const { t } = useI18n();
   return (
     <article className={`insight insight--${insight.severity}`}>
       <header className="insight__header">
         <span className={`insight__badge insight__badge--${insight.severity}`}>
           <span aria-hidden="true">{SEVERITY_ICON[insight.severity]}</span>
-          {SEVERITY_LABEL[insight.severity]}
+          {t(SEVERITY_LABEL[insight.severity])}
         </span>
         <h4>{insight.title}</h4>
       </header>
@@ -35,7 +38,7 @@ function InsightCard({ insight }: { insight: Insight }) {
 
       {insight.evidence.length > 0 ? (
         <>
-          <h5 className="insight__section-title">What the data shows</h5>
+          <h5 className="insight__section-title">{t('insight.whatDataShows')}</h5>
           <ul className="insight__evidence">
             {insight.evidence.map((item) => (
               <li key={item}>{item}</li>
@@ -46,7 +49,7 @@ function InsightCard({ insight }: { insight: Insight }) {
 
       {insight.recommendations.length > 0 ? (
         <>
-          <h5 className="insight__section-title">Recommendations</h5>
+          <h5 className="insight__section-title">{t('insight.recommendations')}</h5>
           <ul className="insight__recommendations">
             {insight.recommendations.map((rec) => (
               <li key={rec.title}>
@@ -62,32 +65,29 @@ function InsightCard({ insight }: { insight: Insight }) {
 }
 
 export function InsightsPanel({ insights, showPositive = false }: InsightsPanelProps) {
+  const { t } = useI18n();
   const problems = insights.filter((insight) => insight.severity !== 'positive');
   const positives = insights.filter((insight) => insight.severity === 'positive');
   const visible = showPositive ? insights : problems;
 
   if (insights.length === 0) {
     return (
-      <section className="card insights" aria-label="Insights">
-        <h3>Insights</h3>
-        <p className="insights__empty">
-          Nothing to report yet. Log a few days of measurements and the analysis will appear here.
-        </p>
+      <section className="card insights" aria-label={t('insight.ariaLabel')}>
+        <h3>{t('insight.title')}</h3>
+        <p className="insights__empty">{t('insight.empty')}</p>
       </section>
     );
   }
 
   return (
-    <section className="insights" aria-label="Insights">
+    <section className="insights" aria-label={t('insight.ariaLabel')}>
       <div className="insights__group">
         <h3>
-          Problems &amp; notes
+          {t('insight.problems')}
           {problems.length > 0 ? <span className="insights__count">{problems.length}</span> : null}
         </h3>
         {visible.length === 0 ? (
-          <p className="card insights__empty">
-            No problems detected in this window. That is a good sign.
-          </p>
+          <p className="card insights__empty">{t('insight.noProblems')}</p>
         ) : (
           <div className="insights__grid">
             {visible.map((insight) => (
@@ -100,7 +100,7 @@ export function InsightsPanel({ insights, showPositive = false }: InsightsPanelP
       {positives.length > 0 ? (
         <div className="insights__group">
           <h3>
-            Working well
+            {t('insight.workingWell')}
             <span className="insights__count insights__count--positive">{positives.length}</span>
           </h3>
           <div className="insights__grid">
@@ -111,11 +111,7 @@ export function InsightsPanel({ insights, showPositive = false }: InsightsPanelP
         </div>
       ) : null}
 
-      <p className="insights__disclaimer">
-        This is a self-tracking tool, not medical advice. Estimates use standard population formulas
-        and are only as good as the data you enter. Talk to a clinician before making significant
-        changes to your diet, activity or medication.
-      </p>
+      <p className="insights__disclaimer">{t('insight.disclaimer')}</p>
     </section>
   );
 }

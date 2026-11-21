@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../App.tsx';
+import { I18nProvider } from '../i18n/context.tsx';
 
 /**
  * Integration tests for the whole app shell. The profile panel owns its own
@@ -44,7 +45,11 @@ describe('App', () => {
 
   it('shows the imported profile in the profile panel', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
 
     const backup = JSON.stringify({
       format: 'health-tracker',

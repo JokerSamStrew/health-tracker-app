@@ -55,6 +55,9 @@ export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'ath
 /** UI theme. A persisted preference, not part of the health model. */
 export type ThemeMode = 'light' | 'dark';
 
+/** UI language. English is the default so existing data and habits stay put. */
+export type Locale = 'en' | 'ru';
+
 export interface Profile {
   name?: string;
   /** ISO calendar date of birth, `YYYY-MM-DD`. Age is derived from it. */

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { EntryForm } from './components/EntryForm.tsx';
 import { BackupPanel } from './components/BackupPanel.tsx';
+import { EntryForm } from './components/EntryForm.tsx';
 import { HealthScoreChart } from './components/HealthScoreChart.tsx';
 import { HistoryTable } from './components/HistoryTable.tsx';
 import { InsightsPanel } from './components/InsightsPanel.tsx';
+import { LanguageToggle } from './components/LanguageToggle.tsx';
 import { MoodChart } from './components/MoodChart.tsx';
 import { ProfilePanel } from './components/ProfilePanel.tsx';
 import { SummaryCards } from './components/SummaryCards.tsx';
@@ -12,15 +13,16 @@ import { TimeSeriesChart } from './components/TimeSeriesChart.tsx';
 import { useHealthData } from './hooks/useHealthData.ts';
 import { useTheme } from './hooks/useTheme.ts';
 import { buildChartData } from './lib/charts.ts';
-import { formatShortDate } from './lib/date.ts';
 import { goalHealthScore } from './lib/goalscore.ts';
 import { DEFAULT_WINDOW_DAYS, scoreTimeline } from './lib/insights.ts';
 import { countMoods } from './lib/moods.ts';
+import { useI18n } from './i18n/context.tsx';
+import { insightTranslator } from './i18n/insightText.ts';
 import type { DailyEntry, Profile } from './types.ts';
 
 const WINDOW_OPTIONS = [7, 14, 30, 90] as const;
 
-/** Mood tags the sample-data generator draws from. */
+/** Mood tags the sample-data generator draws from, kept in canonical English. */
 const DEMO_MOODS = ['Happy', 'Calm', 'Anxious', 'Stressed', 'Low Energy', 'High Energy'] as const;
 
 function generateDemoData(days: number, endDate: string): DailyEntry[] {
@@ -67,6 +69,11 @@ export default function App() {
   // profile instead of the values it was seeded with on mount.
   const [profileRevision, setProfileRevision] = useState(0);
   const { theme, toggleTheme } = useTheme();
+  const i18n = useI18n();
+  const { locale, t, formatShortDate } = i18n;
+  // Insights are generated in the selected language by the pure engine; the
+  // translator is injected so `src/lib/` never has to know about React.
+  const translate = useMemo(() => insightTranslator(locale), [locale]);
   const {
     entries,
     profile,
@@ -78,7 +85,7 @@ export default function App() {
     importData,
     clearAll,
     recovered,
-  } = useHealthData({ windowDays });
+  } = useHealthData({ windowDays, locale, translate });
 
   const today = report.referenceDate;
   const chartData = useMemo(
@@ -93,16 +100,23 @@ export default function App() {
       referenceDate: today,
       windowDays,
       spanDays: Math.max(windowDays, 14),
+      locale,
+      translate,
     }),
-    [entries, profile, today, windowDays],
+    [entries, profile, today, windowDays, locale, translate],
   );
 
   // The score every goal in the profile would produce; depends on the report
   // only for the latest weight, which stands in for "stay where you are"
   // when no target weight is set.
   const goalScore = useMemo(
-    () => goalHealthScore(profile, report.summaries, { referenceDate: today, windowDays }),
-    [profile, report.summaries, today, windowDays],
+    () => goalHealthScore(profile, report.summaries, {
+      referenceDate: today,
+      windowDays,
+      locale,
+      translate,
+    }),
+    [profile, report.summaries, today, windowDays, locale, translate],
   );
 
   const moodCounts = useMemo(
@@ -111,6 +125,7 @@ export default function App() {
   );
 
   const latestWeight = report.summaries.weight.latest;
+  const weightTrend = report.summaries.weight.trendPerWeek;
 
   function handleSeed(): void {
     for (const entry of generateDemoData(90, today)) upsertEntry(entry);
@@ -129,31 +144,29 @@ export default function App() {
             ✚
           </span>
           <div>
-            <h1>Health Tracker</h1>
-            <p>
-              Timeline for weight, steps, sleep, activity and calories &mdash; with
-              analysis and recommendations.
-            </p>
+            <h1>{t('app.title')}</h1>
+            <p>{t('app.tagline')}</p>
           </div>
         </div>
 
         <div className="app__header-actions">
+          <LanguageToggle />
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
           <label className="field field--inline">
-            <span>Window</span>
+            <span>{t('app.window')}</span>
             <select
               value={windowDays}
               onChange={(event) => setWindowDays(Number(event.target.value))}
             >
               {WINDOW_OPTIONS.map((days) => (
                 <option key={days} value={days}>
-                  Last {days} days
+                  {t('app.lastDays', { days })}
                 </option>
               ))}
             </select>
           </label>
           <button type="button" className="button button--ghost" onClick={handleSeed}>
-            Load sample data
+            {t('app.loadSampleData')}
           </button>
         </div>
       </header>
@@ -161,8 +174,7 @@ export default function App() {
       <main className="app__main">
         {recovered ? (
           <p className="banner banner--warning" role="alert">
-            Stored data could not be read and was reset. Anything saved previously in this browser
-            is gone.
+            {t('app.recovered')}
           </p>
         ) : null}
 
@@ -175,63 +187,64 @@ export default function App() {
           theme={theme}
         />
 
-        <section className="charts" aria-label="Timelines">
+        <section className="charts" aria-label={t('app.timelines')}>
           <div className="section-heading">
-            <h2>Timelines</h2>
+            <h2>{t('app.timelines')}</h2>
             <p>
               {formatShortDate(report.windowStart)} &ndash; {formatShortDate(report.windowEnd)}
-              {report.summaries.weight.trendPerWeek !== null
-                ? ` · weight trending ${
-                    report.summaries.weight.trendPerWeek > 0 ? 'up' : 'down'
-                  } ${Math.abs(report.summaries.weight.trendPerWeek).toFixed(2)} kg/wk`
+              {weightTrend !== null
+                ? ` · ${t('app.weightTrend', {
+                    direction: t(weightTrend > 0 ? 'app.trendUp' : 'app.trendDown'),
+                    value: Math.abs(weightTrend).toFixed(2),
+                  })}`
                 : ''}
             </p>
           </div>
           <div className="charts__grid">
             <HealthScoreChart timeline={scoreTimelineData} goal={goalScore} theme={theme} />
             <TimeSeriesChart
-              title="Weight"
+              title={t('metric.weight')}
               metric="weight"
               data={chartData}
               summary={report.summaries.weight}
               goal={profile.targetWeightKg}
-              goalLabel="Target"
+              goalLabel={t('chart.target')}
               theme={theme}
             />
             <TimeSeriesChart
-              title="Steps"
+              title={t('metric.steps')}
               metric="steps"
               data={chartData}
               summary={report.summaries.steps}
               goal={profile.dailyStepGoal}
-              goalLabel="Step goal"
+              goalLabel={t('chart.goalLabel.steps')}
               theme={theme}
             />
             <TimeSeriesChart
-              title="Sleep"
+              title={t('metric.sleep')}
               metric="sleep"
               data={chartData}
               summary={report.summaries.sleep}
               goal={profile.sleepGoalQuality}
-              goalLabel="Sleep goal"
+              goalLabel={t('chart.goalLabel.sleep')}
               theme={theme}
             />
             <TimeSeriesChart
-              title="Physical activity"
+              title={t('metric.activity')}
               metric="activity"
               data={chartData}
               summary={report.summaries.activity}
               goal={profile.activityGoalRating}
-              goalLabel="Activity goal"
+              goalLabel={t('chart.goalLabel.activity')}
               theme={theme}
             />
             <TimeSeriesChart
-              title="Calories eaten"
+              title={t('metric.caloriesEaten')}
               metric="calories"
               data={chartData}
               summary={report.summaries.calories}
               goal={profile.dailyCalorieGoal}
-              goalLabel="Calorie goal"
+              goalLabel={t('chart.goalLabel.calories')}
               theme={theme}
             />
           </div>
@@ -286,8 +299,9 @@ export default function App() {
 
       <footer className="app__footer">
         <p>
-          Data is stored in this browser only via <code>localStorage</code>. Nothing is uploaded.
-          Clearing site data erases your history.
+          {t('app.footerBefore')}
+          <code>{t('app.footerCode')}</code>
+          {t('app.footerAfter')}
         </p>
       </footer>
     </div>

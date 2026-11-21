@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { formatLongDate, formatShortDate } from '../lib/date.ts';
-import { formatMetric } from '../lib/stats.ts';
+import { useI18n, type I18n } from '../i18n/context.tsx';
+import type { TranslationKey } from '../i18n/strings.ts';
 import { METRIC_FIELD } from '../lib/series.ts';
 import type { DailyEntry, MetricKey } from '../types.ts';
 import { METRIC_KEYS, METRIC_UNITS } from '../types.ts';
@@ -19,6 +19,14 @@ const DIGITS: Record<MetricKey, number> = {
   calories: 0,
 };
 
+const METRIC_LABEL_KEYS: Record<MetricKey, TranslationKey> = {
+  weight: 'metricShort.weight',
+  steps: 'metricShort.steps',
+  sleep: 'metricShort.sleep',
+  activity: 'metricShort.activity',
+  calories: 'metricShort.calories',
+};
+
 const EMPTY_MESSAGE: Record<MetricKey, string> = {
   weight: '—',
   steps: '—',
@@ -27,7 +35,11 @@ const EMPTY_MESSAGE: Record<MetricKey, string> = {
   calories: '—',
 };
 
-function cell(entry: DailyEntry, key: MetricKey): string {
+function cell(
+  entry: DailyEntry,
+  key: MetricKey,
+  formatMetric: I18n['formatMetric'],
+): string {
   const field = METRIC_FIELD[key];
   const value = (entry as unknown as Record<string, unknown>)[field];
   if (typeof value !== 'number' || !Number.isFinite(value)) return EMPTY_MESSAGE[key];
@@ -35,6 +47,7 @@ function cell(entry: DailyEntry, key: MetricKey): string {
 }
 
 export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
+  const { t, formatMetric, formatLongDate, formatShortDate, moodLabel } = useI18n();
   const [query, setQuery] = useState('');
 
   const sorted = useMemo(() => [...entries].reverse(), [entries]);
@@ -50,17 +63,17 @@ export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
   }, [sorted, query]);
 
   return (
-    <section className="card history" aria-label="Logged entries">
+    <section className="card history" aria-label={t('history.ariaLabel')}>
       <header className="history__header">
         <h3>
-          Entries
+          {t('history.title')}
           <span className="history__count">{entries.length}</span>
         </h3>
         <label className="history__search">
-          <span className="sr-only">Filter entries</span>
+          <span className="sr-only">{t('history.filterAria')}</span>
           <input
             type="search"
-            placeholder="Filter by date or mood"
+            placeholder={t('history.filterPlaceholder')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -69,24 +82,23 @@ export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
 
       {filtered.length === 0 ? (
         <p className="history__empty">
-          {entries.length === 0
-            ? 'No entries yet. Add your first day using the form.'
-            : 'Nothing matches that filter.'}
+          {entries.length === 0 ? t('history.empty') : t('history.noMatches')}
         </p>
       ) : (
         <div className="history__scroll">
           <table>
             <thead>
               <tr>
-                <th scope="col">Date</th>
+                <th scope="col">{t('common.date')}</th>
                 {METRIC_KEYS.map((key) => (
                   <th scope="col" key={key}>
-                    {key} <span className="history__unit">({METRIC_UNITS[key]})</span>
+                    {t(METRIC_LABEL_KEYS[key])}{' '}
+                    <span className="history__unit">({METRIC_UNITS[key]})</span>
                   </th>
                 ))}
-                <th scope="col">Moods</th>
+                <th scope="col">{t('history.moods')}</th>
                 <th scope="col">
-                  <span className="sr-only">Actions</span>
+                  <span className="sr-only">{t('common.actions')}</span>
                 </th>
               </tr>
             </thead>
@@ -97,14 +109,17 @@ export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
                     {formatShortDate(entry.date)}
                   </th>
                   {METRIC_KEYS.map((key) => (
-                    <td key={key} className={cell(entry, key) === '—' ? 'is-empty' : undefined}>
-                      {cell(entry, key)}
+                    <td
+                      key={key}
+                      className={cell(entry, key, formatMetric) === '—' ? 'is-empty' : undefined}
+                    >
+                      {cell(entry, key, formatMetric)}
                     </td>
                   ))}
                   <td className="history__moods">
                     {(entry.moods ?? []).map((tag) => (
                       <span className="history__mood" key={tag}>
-                        {tag}
+                        {moodLabel(tag)}
                       </span>
                     ))}
                   </td>
@@ -114,17 +129,17 @@ export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
                         type="button"
                         className="button button--ghost"
                         onClick={() => onEdit(entry)}
-                        aria-label={`Edit entry for ${formatLongDate(entry.date)}`}
+                        aria-label={t('history.editAria', { date: formatLongDate(entry.date) })}
                       >
-                        Edit
+                        {t('common.edit')}
                       </button>
                       <button
                         type="button"
                         className="button button--danger"
                         onClick={() => onDelete(entry.date)}
-                        aria-label={`Delete entry for ${formatLongDate(entry.date)}`}
+                        aria-label={t('history.deleteAria', { date: formatLongDate(entry.date) })}
                       >
-                        Delete
+                        {t('common.delete')}
                       </button>
                     </div>
                   </td>

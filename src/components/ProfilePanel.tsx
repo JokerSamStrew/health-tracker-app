@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react';
+import { useI18n } from '../i18n/context.tsx';
+import type { TranslationKey } from '../i18n/strings.ts';
 import { ageFromBirthDate } from '../lib/date.ts';
 import {
-  ACTIVITY_LABELS,
   ACTIVITY_MULTIPLIERS,
   basalMetabolicRate,
   totalDailyEnergyExpenditure,
 } from '../lib/health.ts';
-import { formatNumber } from '../lib/stats.ts';
 import type { ActivityLevel, Profile, Sex } from '../types.ts';
 
 export interface ProfilePanelProps {
@@ -20,6 +20,14 @@ export interface ProfilePanelProps {
 }
 
 const ACTIVITY_LEVELS = Object.keys(ACTIVITY_MULTIPLIERS) as ActivityLevel[];
+
+const ACTIVITY_LABEL_KEYS: Record<ActivityLevel, TranslationKey> = {
+  sedentary: 'activityLabel.sedentary',
+  light: 'activityLabel.light',
+  moderate: 'activityLabel.moderate',
+  active: 'activityLabel.active',
+  athlete: 'activityLabel.athlete',
+};
 
 type FormState = {
   name: string;
@@ -64,6 +72,7 @@ export function ProfilePanel({
   onChange,
   onClearAll,
 }: ProfilePanelProps) {
+  const { t, formatNumber } = useI18n();
   const [form, setForm] = useState<FormState>(() => toFormState(profile));
   const [confirmClear, setConfirmClear] = useState(false);
 
@@ -113,28 +122,26 @@ export function ProfilePanel({
   }
 
   return (
-    <section className="card profile" aria-label="Profile and goals">
-      <h3>Profile &amp; goals</h3>
-      <p className="profile__intro">
-        Optional, but it unlocks energy-balance estimates, BMI and goal tracking.
-      </p>
+    <section className="card profile" aria-label={t('profile.ariaLabel')}>
+      <h3>{t('profile.title')}</h3>
+      <p className="profile__intro">{t('profile.intro')}</p>
 
       <form onSubmit={handleSubmit}>
         <div className="profile__row">
           <label className="field">
-            <span>Name</span>
+            <span>{t('profile.name')}</span>
             <input
               type="text"
               value={form.name}
               maxLength={60}
-              placeholder="Optional"
+              placeholder={t('profile.optional')}
               onChange={(event) => update('name', event.target.value)}
               onBlur={commit}
             />
           </label>
 
           <label className="field">
-            <span>Birth date</span>
+            <span>{t('profile.birthDate')}</span>
             <input
               type="date"
               min="1900-01-01"
@@ -145,23 +152,25 @@ export function ProfilePanel({
               onBlur={commit}
             />
             <small className="field__hint">
-              {age !== null ? `That is ${age} years old today` : 'Age is worked out from this date'}
+              {age !== null
+                ? t('profile.ageHint', { age })
+                : t('profile.ageFallback')}
             </small>
           </label>
 
           <label className="field">
-            <span>Sex</span>
+            <span>{t('profile.sex')}</span>
             <select value={form.sex} onChange={(event) => update('sex', event.target.value)} onBlur={commit}>
-              <option value="">Not set</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
+              <option value="">{t('common.notSet')}</option>
+              <option value="female">{t('profile.female')}</option>
+              <option value="male">{t('profile.male')}</option>
             </select>
           </label>
         </div>
 
         <div className="profile__row">
           <label className="field">
-            <span>Height (cm)</span>
+            <span>{t('profile.height')}</span>
             <input
               type="number"
               inputMode="decimal"
@@ -175,7 +184,7 @@ export function ProfilePanel({
           </label>
 
           <label className="field">
-            <span>Target weight (kg)</span>
+            <span>{t('profile.targetWeight')}</span>
             <input
               type="number"
               inputMode="decimal"
@@ -192,7 +201,7 @@ export function ProfilePanel({
 
         <div className="profile__row">
           <label className="field">
-            <span>Activity level</span>
+            <span>{t('profile.activityLevel')}</span>
             <select
               value={form.activityLevel}
               onChange={(event) => update('activityLevel', event.target.value as ActivityLevel)}
@@ -200,7 +209,7 @@ export function ProfilePanel({
             >
               {ACTIVITY_LEVELS.map((level) => (
                 <option key={level} value={level}>
-                  {ACTIVITY_LABELS[level]}
+                  {t(ACTIVITY_LABEL_KEYS[level])}
                 </option>
               ))}
             </select>
@@ -209,21 +218,21 @@ export function ProfilePanel({
 
         <div className="profile__row">
           <label className="field">
-            <span>Calorie goal (kcal)</span>
+            <span>{t('profile.calorieGoal')}</span>
             <input
               type="number"
               inputMode="numeric"
               min={800}
               max={10000}
               value={form.dailyCalorieGoal}
-              placeholder={tdee !== null ? String(Math.round(tdee)) : 'Auto'}
+              placeholder={tdee !== null ? String(Math.round(tdee)) : t('common.auto')}
               onChange={(event) => update('dailyCalorieGoal', event.target.value)}
               onBlur={commit}
             />
           </label>
 
           <label className="field">
-            <span>Step goal</span>
+            <span>{t('profile.stepGoal')}</span>
             <input
               type="number"
               inputMode="numeric"
@@ -237,7 +246,7 @@ export function ProfilePanel({
           </label>
 
           <label className="field">
-            <span>Sleep goal (/5)</span>
+            <span>{t('profile.sleepGoal')}</span>
             <input
               type="number"
               inputMode="decimal"
@@ -252,7 +261,7 @@ export function ProfilePanel({
           </label>
 
           <label className="field">
-            <span>Activity goal (/5)</span>
+            <span>{t('profile.activityGoal')}</span>
             <input
               type="number"
               inputMode="decimal"
@@ -270,19 +279,27 @@ export function ProfilePanel({
 
       <dl className="profile__estimates">
         <div>
-          <dt>Basal metabolic rate</dt>
-          <dd>{bmr !== null ? `${formatNumber(bmr, 0)} kcal` : 'Needs birth date, sex, height and weight'}</dd>
+          <dt>{t('profile.bmr')}</dt>
+          <dd>
+            {bmr !== null
+              ? `${formatNumber(bmr, 0)} ${t('common.kcal')}`
+              : t('profile.bmrFallback')}
+          </dd>
         </div>
         <div>
-          <dt>Estimated daily burn</dt>
-          <dd>{tdee !== null ? `${formatNumber(tdee, 0)} kcal` : 'Needs the same, plus weight'}</dd>
+          <dt>{t('profile.tdee')}</dt>
+          <dd>
+            {tdee !== null
+              ? `${formatNumber(tdee, 0)} ${t('common.kcal')}`
+              : t('profile.tdeeFallback')}
+          </dd>
         </div>
       </dl>
 
       <div className="profile__danger">
         {confirmClear ? (
           <>
-            <p>This deletes every logged entry and cannot be undone.</p>
+            <p>{t('profile.clearWarning')}</p>
             <div className="profile__danger-actions">
               <button
                 type="button"
@@ -292,16 +309,16 @@ export function ProfilePanel({
                   setConfirmClear(false);
                 }}
               >
-                Yes, delete everything
+                {t('profile.clearConfirm')}
               </button>
               <button type="button" className="button button--ghost" onClick={() => setConfirmClear(false)}>
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </>
         ) : (
           <button type="button" className="button button--ghost" onClick={() => setConfirmClear(true)}>
-            Delete all data
+            {t('profile.clearAll')}
           </button>
         )}
       </div>

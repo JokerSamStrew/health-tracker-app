@@ -9,9 +9,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useI18n } from '../i18n/context.tsx';
+import type { TranslationKey } from '../i18n/strings.ts';
 import { CHART_KEYS, isEmptySeries, metricValues, paddedDomain, type ChartPoint } from '../lib/charts.ts';
-import { formatLongDate } from '../lib/date.ts';
-import { formatMetric, formatNumber } from '../lib/stats.ts';
 import type { MetricKey, MetricSummary, ThemeMode } from '../types.ts';
 import { METRIC_UNITS } from '../types.ts';
 
@@ -28,6 +28,14 @@ export interface TimeSeriesChartProps {
   theme?: ThemeMode;
   color?: string;
 }
+
+const METRIC_LABEL_KEYS: Record<MetricKey, TranslationKey> = {
+  weight: 'metricShort.weight',
+  steps: 'metricShort.steps',
+  sleep: 'metricShort.sleep',
+  activity: 'metricShort.activity',
+  calories: 'metricShort.calories',
+};
 
 interface ChartTokens {
   /** Horizontal grid lines. */
@@ -85,6 +93,7 @@ function ChartTooltip({
   goal?: number;
   goalLabel?: string;
 }) {
+  const { t, formatMetric, formatNumber, formatLongDate } = useI18n();
   if (!active || !payload || payload.length === 0) return null;
 
   return (
@@ -93,7 +102,9 @@ function ChartTooltip({
       <ul>
         {payload.map((entry) => (
           <li key={String(entry.dataKey)}>
-            <span>{entry.dataKey === 'average' ? '7-day average' : 'Value'}</span>
+            <span>
+              {entry.dataKey === 'average' ? t('chart.sevenDayAverage') : t('chart.value')}
+            </span>
             <strong>
               {formatMetric(typeof entry.value === 'number' ? entry.value : null, digits)} {unit}
             </strong>
@@ -123,6 +134,7 @@ function TimeSeriesChartBase({
   theme = 'light',
   color,
 }: TimeSeriesChartProps) {
+  const { t, plural, formatMetric, formatNumber } = useI18n();
   const unit = METRIC_UNITS[metric];
   const { value: valueKey, average: averageKey } = CHART_KEYS[metric];
   const tokens = AXIS_TOKENS[theme];
@@ -141,21 +153,28 @@ function TimeSeriesChartBase({
           <h3 id={`chart-${metric}`}>{title}</h3>
           <p className="chart-card__subtitle">
             {hasData
-              ? `${summary.count} ${summary.count === 1 ? 'entry' : 'entries'} in window`
-              : 'No data yet'}
+              ? t('chart.entriesInWindow', {
+                  count: summary.count,
+                  noun: plural(summary.count, {
+                    one: 'noun.entry.one',
+                    few: 'noun.entry.few',
+                    many: 'noun.entry.many',
+                  }),
+                })
+              : t('common.noDataYet')}
           </p>
         </div>
         <dl className="chart-card__stats">
           <div>
-            <dt>Latest</dt>
+            <dt>{t('common.latest')}</dt>
             <dd>{formatMetric(summary.latest, digits)}</dd>
           </div>
           <div>
-            <dt>Average</dt>
+            <dt>{t('common.average')}</dt>
             <dd>{formatMetric(summary.average, digits)}</dd>
           </div>
           <div>
-            <dt>Trend/wk</dt>
+            <dt>{t('common.trendPerWeek')}</dt>
             <dd className={trendClass(summary.trendPerWeek, metric)}>
               {summary.trendPerWeek === null
                 ? '—'
@@ -229,7 +248,7 @@ function TimeSeriesChartBase({
         </div>
       ) : (
         <p className="chart-card__empty">
-          Log {metric} for at least one day in this window to see the timeline.
+          {t('chart.logMetric', { metric: t(METRIC_LABEL_KEYS[metric]) })}
         </p>
       )}
     </section>

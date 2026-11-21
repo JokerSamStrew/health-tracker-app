@@ -7,15 +7,19 @@
  *
  * Rules only fire when there is enough data to support them, and each one
  * carries the numbers it used as `evidence` so the UI can show its work.
+ *
+ * Text is supplied by an injected `InsightTranslator` (English by default) and
+ * numbers are formatted with the injected `Locale`, so the engine stays pure
+ * while its output can be localized.
  */
 
 import {
-  ACTIVITY_LABELS,
+  activityLabel,
   MIN_DAYS_FOR_INSIGHTS,
   MIN_DAYS_FOR_TREND,
   bmi,
   bmiCategory,
-  BMI_CATEGORIES,
+  bmiLabel,
   type BmiCategory,
   calorieTargetForGoal,
   healthyWeightRange,
@@ -35,6 +39,7 @@ import {
   clamp,
   formatMetric,
   formatNumber,
+  formatSigned,
   linearRegression,
   mean,
   pearsonCorrelation,
@@ -45,6 +50,7 @@ import type {
   DailyEntry,
   HealthReport,
   Insight,
+  Locale,
   MetricKey,
   MetricSummary,
   Profile,
@@ -52,6 +58,7 @@ import type {
   Severity,
 } from '../types.ts';
 import { METRIC_KEYS, SEVERITY_ORDER } from '../types.ts';
+import { enInsightTranslator, type InsightTranslator } from '../i18n/insightText.ts';
 
 export const DEFAULT_WINDOW_DAYS = 14;
 
@@ -149,13 +156,13 @@ function stepGoal(profile: Profile): number {
   return profile.dailyStepGoal ?? 8000;
 }
 
-function fmt(key: MetricKey, value: number | null | undefined): string {
-  return formatMetric(value ?? null, METRIC_DIGITS[key]);
+function fmt(key: MetricKey, value: number | null | undefined, locale: Locale): string {
+  return formatMetric(value ?? null, METRIC_DIGITS[key], locale);
 }
 
 /** Weight in prose, without a trailing `.0` (`5 kg`, not `5.0 kg`). */
-function formatKg(value: number): string {
-  return `${formatMetric(round(value, 1), 1).replace(/\.0$/, '')}`;
+function formatKg(value: number, locale: Locale): string {
+  return formatMetric(round(value, 1), 1, locale).replace(/[.,]0$/, '');
 }
 
 /** Distinct dates that carry at least one metric value. */
@@ -227,26 +234,28 @@ function ruleInsufficientData(
   windowDays: number,
   windowStart: string,
   windowEnd: string,
+  _locale: Locale,
+  translate: InsightTranslator,
 ): Insight | null {
   if (loggedDays >= MIN_DAYS_FOR_INSIGHTS) return null;
   return buildInsight(
     'data.insufficient',
     'data',
     'info',
-    'Not enough data yet',
-    `Log at least ${MIN_DAYS_FOR_INSIGHTS} days to unlock trend analysis and recommendations.`,
+    translate('data.insufficient.title'),
+    translate('data.insufficient.summary', { days: MIN_DAYS_FOR_INSIGHTS }),
     [
-      `${loggedDays} of ${windowDays} days logged`,
-      `Window: ${windowStart} to ${windowEnd}`,
+      translate('data.insufficient.evidence.logged', { logged: loggedDays, window: windowDays }),
+      translate('data.insufficient.evidence.window', { start: windowStart, end: windowEnd }),
     ],
     [
       {
-        title: 'Log every day for two weeks',
-        detail: `A dense ${DEFAULT_WINDOW_DAYS}-day window is what makes the trends and correlations reliable.`,
+        title: translate('data.insufficient.rec1.title'),
+        detail: translate('data.insufficient.rec1.detail', { days: DEFAULT_WINDOW_DAYS }),
       },
       {
-        title: 'One entry per day is enough',
-        detail: 'Weight, steps, sleep, activity and calories are all optional, but the more you log the sharper the advice.',
+        title: translate('data.insufficient.rec2.title'),
+        detail: translate('data.insufficient.rec2.detail'),
       },
     ],
   );
@@ -256,6 +265,8 @@ function ruleInsufficientData(
 function ruleCoverage(
   loggedDays: number,
   windowDays: number,
+  locale: Locale,
+  translate: InsightTranslator,
 ): Insight | null {
   if (loggedDays < MIN_DAYS_FOR_INSIGHTS) return null;
   const ratio = loggedDays / windowDays;
@@ -266,37 +277,52 @@ function ruleCoverage(
     'data.coverage',
     'data',
     severity,
-    'Incomplete logging',
-    `Only ${Math.round(ratio * 100)}% of days in the window have data, so trends may be misleading.`,
-    [`${loggedDays} of ${windowDays} days logged`],
+    translate('data.coverage.title'),
+    translate('data.coverage.summary', {
+      percent: formatNumber(Math.round(ratio * 100), 0, locale),
+    }),
+    [translate('data.coverage.evidence.logged', { logged: loggedDays, window: windowDays })],
     [
       {
-        title: 'Set a daily reminder',
-        detail: 'Even a 30-second entry at the same time each morning keeps the series continuous.',
+        title: translate('data.coverage.rec1.title'),
+        detail: translate('data.coverage.rec1.detail'),
       },
       {
-        title: 'Backfill when you miss a day',
-        detail: 'You can add entries for past dates - gaps of 1-2 days have little effect on the averages.',
+        title: translate('data.coverage.rec2.title'),
+        detail: translate('data.coverage.rec2.detail'),
       },
     ],
   );
 }
 
 /** Metrics with zero values, called out so the user knows what is missing. */
-function ruleMissingMetrics(summaries: Record<MetricKey, MetricSummary>): Insight | null {
+function ruleMissingMetrics(
+  summaries: Record<MetricKey, MetricSummary>,
+  _locale: Locale,
+  translate: InsightTranslator,
+): Insight | null {
   const missing = METRIC_KEYS.filter((key) => summaries[key].count === 0);
   if (missing.length === 0) return null;
+
+  // The names are themselves translated, so the joined list reads naturally in
+  // both languages while the English output stays identical to the raw keys.
+  const metricName = (key: MetricKey): string =>
+    translate(`data.missing-metrics.metric.${key}`);
 
   return buildInsight(
     'data.missing-metrics',
     'data',
     'info',
-    'Some metrics are not being tracked',
-    `No data for ${missing.join(', ')} in this window, so the related checks are skipped.`,
-    missing.map((key) => `${key}: 0 values`),
+    translate('data.missing-metrics.title'),
+    translate('data.missing-metrics.summary', {
+      metrics: missing.map(metricName).join(', '),
+    }),
+    missing.map((key) =>
+      translate('data.missing-metrics.evidence.missing', { metric: metricName(key) }),
+    ),
     missing.map((key) => ({
-      title: `Start logging ${key}`,
-      detail: `Tracking ${key} adds a ${key}-specific analysis to this report.`,
+      title: translate('data.missing-metrics.rec.title', { metric: metricName(key) }),
+      detail: translate('data.missing-metrics.rec.detail', { metric: metricName(key) }),
     })),
   );
 }
@@ -305,6 +331,8 @@ function ruleMissingMetrics(summaries: Record<MetricKey, MetricSummary>): Insigh
 function ruleBmi(
   profile: Profile,
   summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
 ): Insight | null {
   const weight = latestWeight(summaries);
   const heightCm = profile.heightCm;
@@ -315,11 +343,19 @@ function ruleBmi(
   const category = bmiCategory(value);
   if (!category) return null;
 
-  const band = BMI_CATEGORIES[category];
+  const band = bmiLabel(category, locale);
   const range = healthyWeightRange(heightCm);
-  const evidence = [`BMI ${round(value, 1)} (${band.label})`, `Latest weight ${fmt('weight', weight)} kg`];
+  const evidence = [
+    translate('body.bmi.evidence.value', { value: round(value, 1), band }),
+    translate('body.bmi.evidence.latest', { weight: fmt('weight', weight, locale) }),
+  ];
   if (range) {
-    evidence.push(`Healthy BMI weight range: ${fmt('weight', range.min)}-${fmt('weight', range.max)} kg`);
+    evidence.push(
+      translate('body.bmi.evidence.healthyRange', {
+        min: fmt('weight', range.min, locale),
+        max: fmt('weight', range.max, locale),
+      }),
+    );
   }
 
   if (category === 'healthy') {
@@ -327,13 +363,13 @@ function ruleBmi(
       'body.bmi',
       'body',
       'positive',
-      'Body mass index is in the healthy band',
-      `A BMI of ${round(value, 1)} sits inside the 18.5-24.9 range.`,
+      translate('body.bmi.title.healthy'),
+      translate('body.bmi.summary.healthy', { value: round(value, 1) }),
       evidence,
       [
         {
-          title: 'Keep the habits that are working',
-          detail: 'Re-check monthly; BMI is a screening tool, not a diagnosis.',
+          title: translate('body.bmi.recHealthy1.title'),
+          detail: translate('body.bmi.recHealthy1.detail'),
         },
       ],
     );
@@ -345,26 +381,29 @@ function ruleBmi(
   const recommendations: Recommendation[] = overweight
     ? [
         {
-          title: 'Aim for a 0.25-0.75% body weight change per week',
-          detail: `For ${fmt('weight', weight)} kg that is roughly ${fmt('weight', round(weight * 0.005, 2))} kg per week - a sustainable pace.`,
+          title: translate('body.bmi.recOverweight1.title'),
+          detail: translate('body.bmi.recOverweight1.detail', {
+            weight: fmt('weight', weight, locale),
+            weekly: fmt('weight', round(weight * 0.005, 2), locale),
+          }),
         },
         {
-          title: 'Combine resistance training with cardio',
-          detail: 'Two or three sessions a week protects muscle mass while you are in a deficit.',
+          title: translate('body.bmi.recOverweight2.title'),
+          detail: translate('body.bmi.recOverweight2.detail'),
         },
         {
-          title: 'Bring daily movement up gradually',
-          detail: 'Extra 1,000-2,000 steps a day is often easier to sustain than a diet cut.',
+          title: translate('body.bmi.recOverweight3.title'),
+          detail: translate('body.bmi.recOverweight3.detail'),
         },
       ]
     : [
         {
-          title: 'Make sure you are eating enough',
-          detail: `A BMI of ${round(value, 1)} usually calls for a calorie surplus plus resistance training, not more cardio.`,
+          title: translate('body.bmi.recUnderweight1.title'),
+          detail: translate('body.bmi.recUnderweight1.detail', { value: round(value, 1) }),
         },
         {
-          title: 'Get any unintentional weight loss checked',
-          detail: 'Unplanned loss of more than 5% of body weight in a month warrants a doctor visit.',
+          title: translate('body.bmi.recUnderweight2.title'),
+          detail: translate('body.bmi.recUnderweight2.detail'),
         },
       ];
 
@@ -372,17 +411,21 @@ function ruleBmi(
     'body.bmi',
     'body',
     severity,
-    `BMI is in the ${band.label.toLowerCase()} range`,
+    translate('body.bmi.title.other', { band: band.toLowerCase() }),
     overweight
-      ? `A BMI of ${round(value, 1)} is above the healthy range of 18.5-24.9.`
-      : `A BMI of ${round(value, 1)} is below the healthy range of 18.5-24.9.`,
+      ? translate('body.bmi.summary.above', { value: round(value, 1) })
+      : translate('body.bmi.summary.below', { value: round(value, 1) }),
     evidence,
     recommendations,
   );
 }
 
 /** Direction and pace of the weight trend. */
-function ruleWeightTrend(summaries: Record<MetricKey, MetricSummary>): Insight | null {
+function ruleWeightTrend(
+  summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
+): Insight | null {
   const { count, trendPerWeek, latest } = summaries.weight;
   if (count < MIN_DAYS_FOR_TREND || trendPerWeek === null || latest === null || latest === 0) {
     return null;
@@ -392,9 +435,11 @@ function ruleWeightTrend(summaries: Record<MetricKey, MetricSummary>): Insight |
   const trend = round(trendPerWeek, 2);
   const bodyPercentPerWeek = (Math.abs(trend) / latest) * 100;
   const evidence = [
-    `Trend: ${trend > 0 ? '+' : ''}${fmt('weight', trend)} kg per week`,
-    `Latest weight ${fmt('weight', latest)} kg`,
-    `Based on ${count} weigh-ins`,
+    translate('weight.trend.evidence.trend', {
+      value: formatSigned(trend, METRIC_DIGITS.weight, locale),
+    }),
+    translate('weight.trend.evidence.latest', { weight: fmt('weight', latest, locale) }),
+    translate('weight.trend.evidence.basedOn', { count }),
   ];
 
   if (trend <= -t.weightTrendRapidLossKgPerWeek && bodyPercentPerWeek >= t.weightRapidLossBodyPercentPerWeek) {
@@ -402,17 +447,20 @@ function ruleWeightTrend(summaries: Record<MetricKey, MetricSummary>): Insight |
       'weight.trend',
       'weight',
       'critical',
-      'Weight is dropping too fast',
-      `You are losing ${fmt('weight', Math.abs(trend))} kg per week, about ${round(bodyPercentPerWeek, 1)}% of your body weight.`,
+      translate('weight.trend.title.rapid'),
+      translate('weight.trend.summary.rapid', {
+        weight: fmt('weight', Math.abs(trend), locale),
+        percent: round(bodyPercentPerWeek, 1),
+      }),
       evidence,
       [
         {
-          title: 'Eat more and slow the pace down',
-          detail: 'Faster than ~1% of body weight per week you lose muscle as well as fat.',
+          title: translate('weight.trend.recRapid1.title'),
+          detail: translate('weight.trend.recRapid1.detail'),
         },
         {
-          title: 'See a doctor if the loss was not intentional',
-          detail: 'Unexplained rapid weight loss can be a sign of an underlying condition.',
+          title: translate('weight.trend.recRapid2.title'),
+          detail: translate('weight.trend.recRapid2.detail'),
         },
       ],
     );
@@ -424,21 +472,21 @@ function ruleWeightTrend(summaries: Record<MetricKey, MetricSummary>): Insight |
       'weight.trend',
       'weight',
       severity,
-      'Weight is trending up',
-      `Your weight is rising by about ${fmt('weight', trend)} kg per week.`,
+      translate('weight.trend.title.up'),
+      translate('weight.trend.summary.up', { weight: fmt('weight', trend, locale) }),
       evidence,
       [
         {
-          title: 'Check the calorie trend first',
-          detail: 'The "intake vs. burn" insight below shows whether calories are driving this.',
+          title: translate('weight.trend.recUp1.title'),
+          detail: translate('weight.trend.recUp1.detail'),
         },
         {
-          title: 'Look at drinks and sauces',
-          detail: 'Liquid calories and condiments are the most common invisible surplus.',
+          title: translate('weight.trend.recUp2.title'),
+          detail: translate('weight.trend.recUp2.detail'),
         },
         {
-          title: 'Build a small daily movement habit',
-          detail: 'A 15-minute walk after one meal removes roughly 750 kcal per week.',
+          title: translate('weight.trend.recUp3.title'),
+          detail: translate('weight.trend.recUp3.detail'),
         },
       ],
     );
@@ -449,17 +497,19 @@ function ruleWeightTrend(summaries: Record<MetricKey, MetricSummary>): Insight |
       'weight.trend',
       'weight',
       'info',
-      'Weight is trending down',
-      `Your weight is falling by about ${fmt('weight', Math.abs(trend))} kg per week - a healthy pace.`,
+      translate('weight.trend.title.down'),
+      translate('weight.trend.summary.down', {
+        weight: fmt('weight', Math.abs(trend), locale),
+      }),
       evidence,
       [
         {
-          title: 'Protect your muscle',
-          detail: 'Keep protein intake steady and train two or three times a week.',
+          title: translate('weight.trend.recDown1.title'),
+          detail: translate('weight.trend.recDown1.detail'),
         },
         {
-          title: 'Plan the end point',
-          detail: 'Once you reach your target, switch to maintenance calories rather than continuing to cut.',
+          title: translate('weight.trend.recDown2.title'),
+          detail: translate('weight.trend.recDown2.detail'),
         },
       ],
     );
@@ -470,13 +520,13 @@ function ruleWeightTrend(summaries: Record<MetricKey, MetricSummary>): Insight |
       'weight.trend',
       'weight',
       'info',
-      'Weight is creeping up slightly',
-      `A slow gain of about ${fmt('weight', trend)} kg per week - small, but worth watching.`,
+      translate('weight.trend.title.creepUp'),
+      translate('weight.trend.summary.creepUp', { weight: fmt('weight', trend, locale) }),
       evidence,
       [
         {
-          title: 'Watch it for another week',
-          detail: 'If the trend continues, trim 100-200 kcal per day rather than doing a hard cut.',
+          title: translate('weight.trend.recCreepUp1.title'),
+          detail: translate('weight.trend.recCreepUp1.detail'),
         },
       ],
     );
@@ -487,13 +537,15 @@ function ruleWeightTrend(summaries: Record<MetricKey, MetricSummary>): Insight |
       'weight.trend',
       'weight',
       'info',
-      'Weight is drifting down slightly',
-      `A slow loss of about ${fmt('weight', Math.abs(trend))} kg per week.`,
+      translate('weight.trend.title.creepDown'),
+      translate('weight.trend.summary.creepDown', {
+        weight: fmt('weight', Math.abs(trend), locale),
+      }),
       evidence,
       [
         {
-          title: 'Confirm this is intended',
-          detail: 'If you are not actively trying to lose weight, make sure you are eating enough.',
+          title: translate('weight.trend.recCreepDown1.title'),
+          detail: translate('weight.trend.recCreepDown1.detail'),
         },
       ],
     );
@@ -503,13 +555,15 @@ function ruleWeightTrend(summaries: Record<MetricKey, MetricSummary>): Insight |
     'weight.trend',
     'weight',
     'positive',
-    'Weight is stable',
-    `Your weight is holding steady within about ${fmt('weight', Math.abs(trend))} kg per week.`,
+    translate('weight.trend.title.stable'),
+    translate('weight.trend.summary.stable', {
+      weight: fmt('weight', Math.abs(trend), locale),
+    }),
     evidence,
     [
       {
-        title: 'Hold the current routine',
-        detail: 'A stable weight with logged activity and good sleep is the goal, not a lower number.',
+        title: translate('weight.trend.recStable1.title'),
+        detail: translate('weight.trend.recStable1.detail'),
       },
     ],
   );
@@ -520,6 +574,8 @@ function ruleWeightGoal(
   profile: Profile,
   summaries: Record<MetricKey, MetricSummary>,
   age: number | null,
+  locale: Locale,
+  translate: InsightTranslator,
 ): Insight | null {
   const target = profile.targetWeightKg;
   const latest = latestWeight(summaries);
@@ -528,9 +584,11 @@ function ruleWeightGoal(
   const gap = round(target - latest, 1);
   const trend = summaries.weight.trendPerWeek;
   const evidence = [
-    `Target ${fmt('weight', target)} kg`,
-    `Current ${fmt('weight', latest)} kg`,
-    `Gap ${gap > 0 ? '+' : ''}${fmt('weight', gap)} kg`,
+    translate('weight.goal.evidence.target', { weight: fmt('weight', target, locale) }),
+    translate('weight.goal.evidence.current', { weight: fmt('weight', latest, locale) }),
+    translate('weight.goal.evidence.gap', {
+      gap: formatSigned(gap, METRIC_DIGITS.weight, locale),
+    }),
   ];
 
   if (Math.abs(gap) <= THRESHOLDS.weightGoalToleranceKg) {
@@ -538,13 +596,16 @@ function ruleWeightGoal(
       'weight.goal',
       'weight',
       'positive',
-      'Target weight reached',
-      `You are within ${fmt('weight', Math.abs(gap))} kg of your ${fmt('weight', target)} kg target.`,
+      translate('weight.goal.title.reached'),
+      translate('weight.goal.summary.reached', {
+        gap: fmt('weight', Math.abs(gap), locale),
+        target: fmt('weight', target, locale),
+      }),
       evidence,
       [
         {
-          title: 'Switch to maintenance calories',
-          detail: 'Recalculate your daily calorie target from your current weight.',
+          title: translate('weight.goal.recReached1.title'),
+          detail: translate('weight.goal.recReached1.detail'),
         },
       ],
     );
@@ -553,16 +614,28 @@ function ruleWeightGoal(
   const weeksToGoal = Math.ceil(Math.abs(gap) / SAFE_PACE_KG_PER_WEEK);
   const recommendations: Recommendation[] = [
     {
-      title: `A ${SAFE_PACE_KG_PER_WEEK} kg per week pace is the usual target`,
-      detail: `From ${fmt('weight', latest)} kg that is about ${weeksToGoal} ${weeksToGoal === 1 ? 'week' : 'weeks'} to reach ${fmt('weight', target)} kg.`,
+      title: translate('weight.goal.rec1.title', { pace: SAFE_PACE_KG_PER_WEEK }),
+      detail: translate(
+        weeksToGoal === 1 ? 'weight.goal.rec1.detail.one' : 'weight.goal.rec1.detail.other',
+        {
+          weight: fmt('weight', latest, locale),
+          weeks: weeksToGoal,
+          target: fmt('weight', target, locale),
+        },
+      ),
     },
   ];
 
   const recommended = calorieTargetForGoal(profile, latest, age, target);
   if (recommended !== null) {
+    const activity = profile.activityLevel
+      ? activityLabel(profile.activityLevel, locale).split(' (')[0]!.toLowerCase()
+      : translate('weight.goal.rec2.activity.fallback');
     recommendations.push({
-      title: `Aim for roughly ${fmt('calories', recommended)} kcal per day`,
-      detail: `Derived from your estimated burn for a ${profile.activityLevel ? ACTIVITY_LABELS[profile.activityLevel].split(' (')[0]!.toLowerCase() : 'moderate'} profile.`,
+      title: translate('weight.goal.rec2.title', {
+        calories: fmt('calories', recommended, locale),
+      }),
+      detail: translate('weight.goal.rec2.detail', { activity }),
     });
   }
   if (
@@ -570,9 +643,10 @@ function ruleWeightGoal(
     Math.sign(trend) !== Math.sign(gap) &&
     Math.abs(trend) >= THRESHOLDS.weightTrendSignificantKgPerWeek
   ) {
+    const branch = `${trend > 0 ? 'up' : 'down'}${gap > 0 ? 'Up' : 'Down'}` as const;
     recommendations.push({
-      title: 'The current trend moves away from the goal',
-      detail: `You are trending ${trend > 0 ? 'up' : 'down'} while the goal is ${gap > 0 ? 'up' : 'down'}. Close the calorie gap first.`,
+      title: translate('weight.goal.rec3.title'),
+      detail: translate(`weight.goal.rec3.detail.${branch}`),
     });
   }
 
@@ -580,10 +654,12 @@ function ruleWeightGoal(
     'weight.goal',
     'weight',
     'info',
-    gap > 0 ? `${formatKg(gap)} kg to goal` : `${formatKg(Math.abs(gap))} kg above goal`,
     gap > 0
-      ? `You need ${formatKg(gap)} kg more to reach your target.`
-      : `You are ${formatKg(Math.abs(gap))} kg over your target.`,
+      ? translate('weight.goal.title.toGoal', { gap: formatKg(gap, locale) })
+      : translate('weight.goal.title.aboveGoal', { gap: formatKg(Math.abs(gap), locale) }),
+    gap > 0
+      ? translate('weight.goal.summary.toGoal', { gap: formatKg(gap, locale) })
+      : translate('weight.goal.summary.aboveGoal', { gap: formatKg(Math.abs(gap), locale) }),
     evidence,
     recommendations,
   );
@@ -598,6 +674,8 @@ function ruleWeightForecast(
   summaries: Record<MetricKey, MetricSummary>,
   windowEntries: readonly DailyEntry[],
   referenceDate: string,
+  locale: Locale,
+  translate: InsightTranslator,
 ): Insight | null {
   const target = profile.targetWeightKg;
   const latest = latestWeight(summaries);
@@ -621,37 +699,70 @@ function ruleWeightForecast(
 
   const recommendations: Recommendation[] = [
     {
-      title: 'Treat the date as a projection, not a promise',
-      detail:
-        'It extends the trend of your recent weigh-ins in a straight line. A plateau, an illness or a holiday moves it, so re-check as you log.',
+      title: translate('weight.forecast.rec1.title'),
+      detail: translate('weight.forecast.rec1.detail'),
     },
   ];
   if (daysAtSafePace <= FORECAST_LIMITS.maxHorizonDays) {
     recommendations.push({
-      title: 'Compare with the usual safe pace',
-      detail: `At ${SAFE_PACE_KG_PER_WEEK} kg per week the same gap takes about ${formatNumber(daysAtSafePace)} days, and a change that size is far easier to sustain.`,
+      title: translate('weight.forecast.rec2.title'),
+      detail: translate('weight.forecast.rec2.detail', {
+        pace: SAFE_PACE_KG_PER_WEEK,
+        days: formatNumber(daysAtSafePace, 0, locale),
+      }),
     });
   }
+
+  const paceText = fmt('weight', pace, locale);
+  const targetText = fmt('weight', target, locale);
+  const daysText = formatNumber(daysToGoal, 0, locale);
+  const arrivalText = formatLongDate(projectedDate, locale);
+  const anchorText = formatShortDate(anchorDate, locale);
 
   return buildInsight(
     'weight.forecast',
     'weight',
     'info',
-    `Target in ${formatNumber(daysToGoal)} days`,
-    `At your current pace of ${fmt('weight', pace)} kg per week you would reach ${fmt('weight', target)} kg in ${formatNumber(daysToGoal)} days${daysToGoal >= 21 ? ` (about ${formatNumber(weeks)} weeks)` : ''}, on ${formatLongDate(projectedDate)}.`,
+    translate('weight.forecast.title', { days: daysText }),
+    translate(
+      daysToGoal >= 21 ? 'weight.forecast.summary.withWeeks' : 'weight.forecast.summary.short',
+      {
+        pace: paceText,
+        target: targetText,
+        days: daysText,
+        weeks: formatNumber(weeks, 0, locale),
+        date: arrivalText,
+      },
+    ),
     [
-      `Trend ${trendKgPerWeek > 0 ? '+' : ''}${fmt('weight', trendKgPerWeek)} kg per week`,
-      `Current ${fmt('weight', latest)} kg (last weigh-in ${formatShortDate(anchorDate)})`,
-      `Target ${fmt('weight', target)} kg`,
-      `Gap ${gapKg > 0 ? '+' : ''}${fmt('weight', gapKg)} kg`,
-      `Arrival ${formatLongDate(projectedDate)} - ${formatNumber(daysToGoal)} days from ${formatShortDate(anchorDate)}`,
+      translate('weight.forecast.evidence.trend', {
+        trend: formatSigned(trendKgPerWeek, METRIC_DIGITS.weight, locale),
+      }),
+      translate('weight.forecast.evidence.current', {
+        weight: fmt('weight', latest, locale),
+        date: anchorText,
+      }),
+      translate('weight.forecast.evidence.target', { weight: targetText }),
+      translate('weight.forecast.evidence.gap', {
+        gap: formatSigned(gapKg, METRIC_DIGITS.weight, locale),
+      }),
+      translate('weight.forecast.evidence.arrival', {
+        date: arrivalText,
+        days: daysText,
+        from: anchorText,
+      }),
     ],
     recommendations,
   );
 }
 
 /** Average sleep quality against the personal goal. */
-function ruleSleepAverage(profile: Profile, summaries: Record<MetricKey, MetricSummary>): Insight | null {
+function ruleSleepAverage(
+  profile: Profile,
+  summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
+): Insight | null {
   const { count, average } = summaries.sleep;
   if (count < MIN_DAYS_FOR_INSIGHTS || average === null) return null;
 
@@ -659,9 +770,9 @@ function ruleSleepAverage(profile: Profile, summaries: Record<MetricKey, MetricS
   const avg = round(average, 1);
   const deficit = round(goal - avg, 1);
   const evidence = [
-    `Average ${fmt('sleep', avg)}/5`,
-    `Goal ${fmt('sleep', goal)}/5`,
-    `Based on ${count} nights`,
+    translate('sleep.average.evidence.average', { value: fmt('sleep', avg, locale) }),
+    translate('sleep.average.evidence.goal', { value: fmt('sleep', goal, locale) }),
+    translate('sleep.average.evidence.basedOn', { count }),
   ];
 
   if (avg <= THRESHOLDS.sleepVeryPoorQuality) {
@@ -669,21 +780,21 @@ function ruleSleepAverage(profile: Profile, summaries: Record<MetricKey, MetricS
       'sleep.average',
       'recovery',
       'critical',
-      'Sleep quality is very poor',
-      `You are averaging only ${fmt('sleep', avg)}/5 for sleep quality - consistently poor rest.`,
+      translate('sleep.average.title.veryPoor'),
+      translate('sleep.average.summary.veryPoor', { value: fmt('sleep', avg, locale) }),
       evidence,
       [
         {
-          title: 'Protect a fixed wake time',
-          detail: 'A fixed wake time, even at the weekend, pulls bedtime forward on its own.',
+          title: translate('sleep.average.recVeryPoor1.title'),
+          detail: translate('sleep.average.recVeryPoor1.detail'),
         },
         {
-          title: 'Cut caffeine 8 hours before bed',
-          detail: 'Caffeine has a half-life of about 5 hours and delays sleep onset.',
+          title: translate('sleep.average.recVeryPoor2.title'),
+          detail: translate('sleep.average.recVeryPoor2.detail'),
         },
         {
-          title: 'Make the room dark and cool',
-          detail: 'Bright light and warmth both fragment the night and delay sleep onset.',
+          title: translate('sleep.average.recVeryPoor3.title'),
+          detail: translate('sleep.average.recVeryPoor3.detail'),
         },
       ],
     );
@@ -694,21 +805,25 @@ function ruleSleepAverage(profile: Profile, summaries: Record<MetricKey, MetricS
       'sleep.average',
       'recovery',
       'warning',
-      'Sleep quality below target',
-      `You are averaging ${fmt('sleep', avg)}/5, about ${fmt('sleep', deficit)} below your ${fmt('sleep', goal)}/5 target.`,
+      translate('sleep.average.title.below'),
+      translate('sleep.average.summary.below', {
+        value: fmt('sleep', avg, locale),
+        deficit: fmt('sleep', deficit, locale),
+        goal: fmt('sleep', goal, locale),
+      }),
       evidence,
       [
         {
-          title: 'Move bedtime earlier by 15 minutes a week',
-          detail: 'Adenosine build-up, not willpower, sets your sleep pressure - extend the runway.',
+          title: translate('sleep.average.recBelow1.title'),
+          detail: translate('sleep.average.recBelow1.detail'),
         },
         {
-          title: 'Dim the evening environment',
-          detail: 'Bright light and scrolling both suppress melatonin release.',
+          title: translate('sleep.average.recBelow2.title'),
+          detail: translate('sleep.average.recBelow2.detail'),
         },
         {
-          title: 'Review anything that keeps you up',
-          detail: 'Late caffeine, alcohol, and irregular meal timing are the usual culprits.',
+          title: translate('sleep.average.recBelow3.title'),
+          detail: translate('sleep.average.recBelow3.detail'),
         },
       ],
     );
@@ -718,30 +833,43 @@ function ruleSleepAverage(profile: Profile, summaries: Record<MetricKey, MetricS
     'sleep.average',
     'recovery',
     'positive',
-    'Sleep quality is on target',
-    `You are averaging ${fmt('sleep', avg)}/5, right around your ${fmt('sleep', goal)}/5 goal.`,
+    translate('sleep.average.title.onTarget'),
+    translate('sleep.average.summary.onTarget', {
+      value: fmt('sleep', avg, locale),
+      goal: fmt('sleep', goal, locale),
+    }),
     evidence,
     [
       {
-        title: 'Sleep quality is your cheapest performance gain',
-        detail: 'It supports training quality, appetite regulation and mood more than most supplements do.',
+        title: translate('sleep.average.recOnTarget1.title'),
+        detail: translate('sleep.average.recOnTarget1.detail'),
       },
     ],
   );
 }
 
 /** Night-to-night consistency, measured as the coefficient of variation. */
-function ruleSleepRegularity(summaries: Record<MetricKey, MetricSummary>): Insight | null {
+function ruleSleepRegularity(
+  summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
+): Insight | null {
   const { count, average, stdDev } = summaries.sleep;
   if (count < MIN_DAYS_FOR_TREND || average === null || stdDev === null) return null;
 
   const cv = variationRatio(average, stdDev);
   if (cv === null) return null;
 
+  const percent = formatNumber(round(cv, 0), 0, locale);
   const evidence = [
-    `Nightly variation: ${fmt('sleep', stdDev)}/5 (standard deviation)`,
-    `Coefficient of variation ${round(cv, 0)}%`,
-    `Average ${fmt('sleep', average)}/5 across ${count} nights`,
+    translate('sleep.regularity.evidence.variation', {
+      value: fmt('sleep', stdDev, locale),
+    }),
+    translate('sleep.regularity.evidence.cv', { percent }),
+    translate('sleep.regularity.evidence.average', {
+      value: fmt('sleep', average, locale),
+      count,
+    }),
   ];
 
   if (cv <= THRESHOLDS.sleepIrregularCvPercent) {
@@ -749,13 +877,13 @@ function ruleSleepRegularity(summaries: Record<MetricKey, MetricSummary>): Insig
       'sleep.regularity',
       'recovery',
       'positive',
-      'Sleep quality is consistent',
-      `Your sleep quality varies by only ${round(cv, 0)}%, which is the ideal pattern.`,
+      translate('sleep.regularity.title.consistent'),
+      translate('sleep.regularity.summary.consistent', { percent }),
       evidence,
       [
         {
-          title: 'Keep the routine',
-          detail: 'Consistency matters as much as the rating itself for recovery quality.',
+          title: translate('sleep.regularity.recConsistent1.title'),
+          detail: translate('sleep.regularity.recConsistent1.detail'),
         },
       ],
     );
@@ -765,21 +893,21 @@ function ruleSleepRegularity(summaries: Record<MetricKey, MetricSummary>): Insig
     'sleep.regularity',
     'recovery',
     'warning',
-    'Irregular sleep pattern',
-    `Your sleep quality swings by ${round(cv, 0)}%, which usually means an unstable schedule or routine.`,
+    translate('sleep.regularity.title.irregular'),
+    translate('sleep.regularity.summary.irregular', { percent }),
     evidence,
     [
       {
-        title: 'Anchor on the wake time',
-        detail: 'Even on weekends, stay within an hour of your weekday wake time.',
+        title: translate('sleep.regularity.recIrregular1.title'),
+        detail: translate('sleep.regularity.recIrregular1.detail'),
       },
       {
-        title: 'Use the same wind-down sequence',
-        detail: 'Repetition trains the brain to associate the routine with sleep.',
+        title: translate('sleep.regularity.recIrregular2.title'),
+        detail: translate('sleep.regularity.recIrregular2.detail'),
       },
       {
-        title: 'Get daylight within an hour of waking',
-        detail: 'Morning light is the strongest cue for tonight`s sleep drive.',
+        title: translate('sleep.regularity.recIrregular3.title'),
+        detail: translate('sleep.regularity.recIrregular3.detail'),
       },
     ],
   );
@@ -788,6 +916,8 @@ function ruleSleepRegularity(summaries: Record<MetricKey, MetricSummary>): Insig
 /** Cross-metric: poor sleep quality alongside a rising weight. */
 function ruleSleepWeightInteraction(
   summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
 ): Insight | null {
   if (summaries.sleep.count < MIN_DAYS_FOR_TREND || summaries.weight.count < MIN_DAYS_FOR_TREND) {
     return null;
@@ -803,27 +933,39 @@ function ruleSleepWeightInteraction(
     'sleep.weight-interaction',
     'recovery',
     'warning',
-    'Poor sleep is compounding your weight trend',
-    `Average sleep quality of ${fmt('sleep', sleepAvg)}/5 alongside a ${fmt('weight', trend)} kg/week gain is a known appetite-metabolism pattern.`,
+    translate('sleep.weight-interaction.title'),
+    translate('sleep.weight-interaction.summary', {
+      sleep: fmt('sleep', sleepAvg, locale),
+      weight: fmt('weight', trend, locale),
+    }),
     [
-      `Average sleep quality ${fmt('sleep', sleepAvg)}/5`,
-      `Weight trend ${trend > 0 ? '+' : ''}${fmt('weight', trend)} kg per week`,
+      translate('sleep.weight-interaction.evidence.average', {
+        value: fmt('sleep', sleepAvg, locale),
+      }),
+      translate('sleep.weight-interaction.evidence.trend', {
+        trend: formatSigned(trend, METRIC_DIGITS.weight, locale),
+      }),
     ],
     [
       {
-        title: 'Treat sleep as part of the weight plan',
-        detail: 'Sleep restriction raises ghrelin and lowers leptin, so hunger signals get louder.',
+        title: translate('sleep.weight-interaction.rec1.title'),
+        detail: translate('sleep.weight-interaction.rec1.detail'),
       },
       {
-        title: 'Fix sleep before tightening calories',
-        detail: 'Cutting calories while sleep-deprived is the combination most likely to fail.',
+        title: translate('sleep.weight-interaction.rec2.title'),
+        detail: translate('sleep.weight-interaction.rec2.detail'),
       },
     ],
   );
 }
 
 /** Average steps against the daily goal. */
-function ruleSteps(profile: Profile, summaries: Record<MetricKey, MetricSummary>): Insight | null {
+function ruleSteps(
+  profile: Profile,
+  summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
+): Insight | null {
   const { count, average } = summaries.steps;
   if (count < MIN_DAYS_FOR_INSIGHTS || average === null) return null;
 
@@ -834,28 +976,37 @@ function ruleSteps(profile: Profile, summaries: Record<MetricKey, MetricSummary>
   const ratio = goal > 0 ? avg / goal : null;
 
   const evidence = [
-    `Average ${fmt('steps', avg)} steps per day`,
-    `Goal ${fmt('steps', goal)} steps`,
-    `Based on ${count} days`,
+    translate('steps.average.evidence.average', { steps: fmt('steps', avg, locale) }),
+    translate('steps.average.evidence.goal', { steps: fmt('steps', goal, locale) }),
+    translate('steps.average.evidence.basedOn', { count }),
   ];
-  if (ratio !== null) evidence.push(`${Math.round(ratio * 100)}% of the daily goal`);
+  if (ratio !== null) {
+    evidence.push(
+      translate('steps.average.evidence.goalPercent', {
+        percent: formatNumber(Math.round(ratio * 100), 0, locale),
+      }),
+    );
+  }
 
   if (ratio !== null && ratio < THRESHOLDS.stepsVeryLowRatio) {
     return buildInsight(
       'steps.average',
       'activity',
       'warning',
-      'Very sedentary days',
-      `You are averaging ${fmt('steps', avg)} steps, less than half of your ${fmt('steps', goal)} step goal.`,
+      translate('steps.average.title.veryLow'),
+      translate('steps.average.summary.veryLow', {
+        steps: fmt('steps', avg, locale),
+        goal: fmt('steps', goal, locale),
+      }),
       evidence,
       [
         {
-          title: 'Start with a 10-minute walk after a meal',
-          detail: 'Post-meal walks blunt the glucose spike and add ~1,000 steps each.',
+          title: translate('steps.average.recVeryLow1.title'),
+          detail: translate('steps.average.recVeryLow1.detail'),
         },
         {
-          title: 'Break up sitting every hour',
-          detail: 'Set a recurring reminder to stand for two minutes.',
+          title: translate('steps.average.recVeryLow2.title'),
+          detail: translate('steps.average.recVeryLow2.detail'),
         },
       ],
     );
@@ -866,13 +1017,16 @@ function ruleSteps(profile: Profile, summaries: Record<MetricKey, MetricSummary>
       'steps.average',
       'activity',
       'info',
-      'Below your step goal',
-      `You are averaging ${fmt('steps', avg)} steps, ${Math.round((1 - ratio) * 100)}% below your goal.`,
+      translate('steps.average.title.below'),
+      translate('steps.average.summary.below', {
+        steps: fmt('steps', avg, locale),
+        percent: formatNumber(Math.round((1 - ratio) * 100), 0, locale),
+      }),
       evidence,
       [
         {
-          title: 'Add 1,000 steps a day this week',
-          detail: 'Park further away, take the stairs, or walk one extra call.',
+          title: translate('steps.average.recBelow1.title'),
+          detail: translate('steps.average.recBelow1.detail'),
         },
       ],
     );
@@ -882,43 +1036,57 @@ function ruleSteps(profile: Profile, summaries: Record<MetricKey, MetricSummary>
     'steps.average',
     'activity',
     'positive',
-    'Daily movement target is met',
-    `You are averaging ${fmt('steps', avg)} steps against a goal of ${fmt('steps', goal)}.`,
+    translate('steps.average.title.met'),
+    translate('steps.average.summary.met', {
+      steps: fmt('steps', avg, locale),
+      goal: fmt('steps', goal, locale),
+    }),
     evidence,
     [
       {
-        title: 'Keep the streak visible',
-        detail: 'Knowing which days you missed the goal makes the next one easier.',
+        title: translate('steps.average.recMet1.title'),
+        detail: translate('steps.average.recMet1.detail'),
       },
     ],
   );
 }
 
 /** Are steps trending up or down? */
-function ruleStepsTrend(summaries: Record<MetricKey, MetricSummary>): Insight | null {
+function ruleStepsTrend(
+  summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
+): Insight | null {
   const { count, trendPerWeek } = summaries.steps;
   if (count < MIN_DAYS_FOR_TREND || trendPerWeek === null) return null;
 
   const trend = round(trendPerWeek, 0);
   const threshold = THRESHOLDS.stepsTrendThresholdPerWeek;
-  const evidence = [`Step trend ${trend > 0 ? '+' : ''}${fmt('steps', trend)} per week`, `${count} days logged`];
+  const evidence = [
+    translate('steps.trend.evidence.trend', {
+      trend: formatSigned(trend, METRIC_DIGITS.steps, locale),
+    }),
+    translate('steps.trend.evidence.logged', { count }),
+  ];
 
   if (trend <= -threshold) {
     return buildInsight(
       'steps.trend',
       'activity',
       'warning',
-      'Activity is declining',
-      `Your daily steps are dropping by about ${fmt('steps', Math.abs(trend))} per week.`,
+      translate('steps.trend.title.declining'),
+      translate('steps.trend.summary.declining', {
+        steps: fmt('steps', Math.abs(trend), locale),
+      }),
       evidence,
       [
         {
-          title: 'Find the drop-off point',
-          detail: 'Compare work days with free days - the loss is usually structural, not motivational.',
+          title: translate('steps.trend.recDeclining1.title'),
+          detail: translate('steps.trend.recDeclining1.detail'),
         },
         {
-          title: 'Lower the target to something easy',
-          detail: 'Even 500 steps more per day protects the habit while the routine rebuilds.',
+          title: translate('steps.trend.recDeclining2.title'),
+          detail: translate('steps.trend.recDeclining2.detail'),
         },
       ],
     );
@@ -929,13 +1097,13 @@ function ruleStepsTrend(summaries: Record<MetricKey, MetricSummary>): Insight | 
       'steps.trend',
       'activity',
       'positive',
-      'Activity is trending up',
-      `Your daily steps are climbing by about ${fmt('steps', trend)} per week.`,
+      translate('steps.trend.title.up'),
+      translate('steps.trend.summary.up', { steps: fmt('steps', trend, locale) }),
       evidence,
       [
         {
-          title: 'Bank the new normal',
-          detail: 'Set a step floor slightly below your current average to keep the momentum.',
+          title: translate('steps.trend.recUp1.title'),
+          detail: translate('steps.trend.recUp1.detail'),
         },
       ],
     );
@@ -948,6 +1116,8 @@ function ruleStepsTrend(summaries: Record<MetricKey, MetricSummary>): Insight | 
 function ruleActivityAverage(
   profile: Profile,
   summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
 ): Insight | null {
   const { count, average } = summaries.activity;
   if (count < MIN_DAYS_FOR_INSIGHTS || average === null) return null;
@@ -956,9 +1126,9 @@ function ruleActivityAverage(
   const avg = round(average, 1);
   const deficit = round(goal - avg, 1);
   const evidence = [
-    `Average ${fmt('activity', avg)}/5`,
-    `Goal ${fmt('activity', goal)}/5`,
-    `Based on ${count} days`,
+    translate('activity.average.evidence.average', { value: fmt('activity', avg, locale) }),
+    translate('activity.average.evidence.goal', { value: fmt('activity', goal, locale) }),
+    translate('activity.average.evidence.basedOn', { count }),
   ];
 
   if (avg <= THRESHOLDS.activityVeryLowRating) {
@@ -966,17 +1136,17 @@ function ruleActivityAverage(
       'activity.average',
       'activity',
       'warning',
-      'Physical activity is very low',
-      `You are averaging only ${fmt('activity', avg)}/5 for physical activity - barely moving on most days.`,
+      translate('activity.average.title.veryLow'),
+      translate('activity.average.summary.veryLow', { value: fmt('activity', avg, locale) }),
       evidence,
       [
         {
-          title: 'Start with a 10-minute walk',
-          detail: 'A short daily walk is far easier to keep up than a planned workout, and it counts.',
+          title: translate('activity.average.recVeryLow1.title'),
+          detail: translate('activity.average.recVeryLow1.detail'),
         },
         {
-          title: 'Break up sitting every hour',
-          detail: 'Set a recurring reminder to stand for two minutes.',
+          title: translate('activity.average.recVeryLow2.title'),
+          detail: translate('activity.average.recVeryLow2.detail'),
         },
       ],
     );
@@ -987,17 +1157,21 @@ function ruleActivityAverage(
       'activity.average',
       'activity',
       'info',
-      'Activity below target',
-      `You are averaging ${fmt('activity', avg)}/5, about ${fmt('activity', deficit)} below your ${fmt('activity', goal)}/5 target.`,
+      translate('activity.average.title.below'),
+      translate('activity.average.summary.below', {
+        value: fmt('activity', avg, locale),
+        deficit: fmt('activity', deficit, locale),
+        goal: fmt('activity', goal, locale),
+      }),
       evidence,
       [
         {
-          title: 'Pick one activity you actually enjoy',
-          detail: 'Three moderate sessions a week is a solid base - consistency beats intensity.',
+          title: translate('activity.average.recBelow1.title'),
+          detail: translate('activity.average.recBelow1.detail'),
         },
         {
-          title: 'Attach movement to an existing habit',
-          detail: 'A walk straight after lunch removes the decision from the day.',
+          title: translate('activity.average.recBelow2.title'),
+          detail: translate('activity.average.recBelow2.detail'),
         },
       ],
     );
@@ -1007,30 +1181,43 @@ function ruleActivityAverage(
     'activity.average',
     'activity',
     'positive',
-    'Physical activity is on target',
-    `You are averaging ${fmt('activity', avg)}/5, right around your ${fmt('activity', goal)}/5 goal.`,
+    translate('activity.average.title.onTarget'),
+    translate('activity.average.summary.onTarget', {
+      value: fmt('activity', avg, locale),
+      goal: fmt('activity', goal, locale),
+    }),
     evidence,
     [
       {
-        title: 'Keep the rhythm',
-        detail: 'Regular movement protects cardiovascular health, mood and sleep quality.',
+        title: translate('activity.average.recOnTarget1.title'),
+        detail: translate('activity.average.recOnTarget1.detail'),
       },
     ],
   );
 }
 
 /** How steady the activity rating is from day to day. */
-function ruleActivityRegularity(summaries: Record<MetricKey, MetricSummary>): Insight | null {
+function ruleActivityRegularity(
+  summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
+): Insight | null {
   const { count, average, stdDev } = summaries.activity;
   if (count < MIN_DAYS_FOR_TREND || average === null || stdDev === null) return null;
 
   const cv = variationRatio(average, stdDev);
   if (cv === null) return null;
 
+  const percent = formatNumber(round(cv, 0), 0, locale);
   const evidence = [
-    `Day-to-day variation: ${fmt('activity', stdDev)}/5 (standard deviation)`,
-    `Coefficient of variation ${round(cv, 0)}%`,
-    `Average ${fmt('activity', average)}/5 across ${count} days`,
+    translate('activity.regularity.evidence.variation', {
+      value: fmt('activity', stdDev, locale),
+    }),
+    translate('activity.regularity.evidence.cv', { percent }),
+    translate('activity.regularity.evidence.average', {
+      value: fmt('activity', average, locale),
+      count,
+    }),
   ];
 
   if (cv <= THRESHOLDS.activityIrregularCvPercent) {
@@ -1038,13 +1225,13 @@ function ruleActivityRegularity(summaries: Record<MetricKey, MetricSummary>): In
       'activity.regularity',
       'activity',
       'positive',
-      'Activity is steady',
-      `Your activity rating varies by only ${round(cv, 0)}%, which is the ideal pattern.`,
+      translate('activity.regularity.title.steady'),
+      translate('activity.regularity.summary.steady', { percent }),
       evidence,
       [
         {
-          title: 'Keep the routine',
-          detail: 'Steady movement is easier on the body than alternating hard and idle days.',
+          title: translate('activity.regularity.recSteady1.title'),
+          detail: translate('activity.regularity.recSteady1.detail'),
         },
       ],
     );
@@ -1054,17 +1241,17 @@ function ruleActivityRegularity(summaries: Record<MetricKey, MetricSummary>): In
     'activity.regularity',
     'activity',
     'info',
-    'Activity comes in bursts',
-    `Your activity rating swings by ${round(cv, 0)}%, which usually means a few intense days between quiet ones.`,
+    translate('activity.regularity.title.bursts'),
+    translate('activity.regularity.summary.bursts', { percent }),
     evidence,
     [
       {
-        title: 'Add one easy day between hard ones',
-        detail: 'A 20-minute walk on the quiet days keeps the weekly total up without the spikes.',
+        title: translate('activity.regularity.recBursts1.title'),
+        detail: translate('activity.regularity.recBursts1.detail'),
       },
       {
-        title: 'Judge the week, not the day',
-        detail: 'The weekly average is what carries the health benefit.',
+        title: translate('activity.regularity.recBursts2.title'),
+        detail: translate('activity.regularity.recBursts2.detail'),
       },
     ],
   );
@@ -1078,6 +1265,8 @@ function ruleActivityRegularity(summaries: Record<MetricKey, MetricSummary>): In
 function ruleActivityStepsAlignment(
   profile: Profile,
   summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
 ): Insight | null {
   if (summaries.activity.count < MIN_DAYS_FOR_TREND) return null;
   if (summaries.steps.count < MIN_DAYS_FOR_TREND) return null;
@@ -1090,10 +1279,15 @@ function ruleActivityStepsAlignment(
   const stepRatio = goal > 0 ? steps / goal : null;
   if (stepRatio === null) return null;
 
+  const percent = formatNumber(Math.round(stepRatio * 100), 0, locale);
   const evidence = [
-    `Average activity rating ${fmt('activity', rating)}/5`,
-    `Average ${fmt('steps', steps)} steps per day`,
-    `${Math.round(stepRatio * 100)}% of the daily step goal`,
+    translate('activity.steps-alignment.evidence.rating', {
+      value: fmt('activity', rating, locale),
+    }),
+    translate('activity.steps-alignment.evidence.steps', {
+      steps: fmt('steps', steps, locale),
+    }),
+    translate('activity.steps-alignment.evidence.goalPercent', { percent }),
   ];
 
   // A high rating with very few steps means the training was not walkable.
@@ -1102,17 +1296,20 @@ function ruleActivityStepsAlignment(
       'activity.steps-alignment',
       'activity',
       'info',
-      'Your step count understates your training',
-      `You rate your activity ${fmt('activity', rating)}/5 but only average ${Math.round(stepRatio * 100)}% of your step goal - cycling, swimming and gym work add far fewer steps.`,
+      translate('activity.steps-alignment.title.understates'),
+      translate('activity.steps-alignment.summary.understates', {
+        rating: fmt('activity', rating, locale),
+        percent,
+      }),
       evidence,
       [
         {
-          title: 'Keep rating those days',
-          detail: 'The rating is what lets the analysis see training that never reaches your step count.',
+          title: translate('activity.steps-alignment.recUnderstates1.title'),
+          detail: translate('activity.steps-alignment.recUnderstates1.detail'),
         },
         {
-          title: 'Do not chase the step goal on training days',
-          detail: 'A hard session on 3,000 steps still beats a sedentary 10,000.',
+          title: translate('activity.steps-alignment.recUnderstates2.title'),
+          detail: translate('activity.steps-alignment.recUnderstates2.detail'),
         },
       ],
     );
@@ -1129,13 +1326,16 @@ function ruleActivityStepsAlignment(
       'activity.steps-alignment',
       'activity',
       'info',
-      'Your activity rating looks low',
-      `You rate your activity ${fmt('activity', rating)}/5 while averaging ${fmt('steps', steps)} steps a day, at or above your goal.`,
+      translate('activity.steps-alignment.title.low'),
+      translate('activity.steps-alignment.summary.low', {
+        rating: fmt('activity', rating, locale),
+        steps: fmt('steps', steps, locale),
+      }),
       evidence,
       [
         {
-          title: 'Check the rating on those days',
-          detail: 'Walking 8,000 steps is a moderate day, so the number may be understating it.',
+          title: translate('activity.steps-alignment.recLow1.title'),
+          detail: translate('activity.steps-alignment.recLow1.detail'),
         },
       ],
     );
@@ -1149,6 +1349,8 @@ function ruleCalorieBalance(
   profile: Profile,
   summaries: Record<MetricKey, MetricSummary>,
   age: number | null,
+  locale: Locale,
+  translate: InsightTranslator,
 ): Insight | null {
   const { count, average } = summaries.calories;
   if (count < MIN_DAYS_FOR_INSIGHTS || average === null) return null;
@@ -1158,12 +1360,23 @@ function ruleCalorieBalance(
   const target = profile.dailyCalorieGoal ?? estimatedBurn;
 
   const avg = round(average, 0);
-  const evidence = [`Average intake ${fmt('calories', avg)} kcal per day`, `Based on ${count} days`];
+  const evidence = [
+    translate('calories.balance.evidence.average', { calories: fmt('calories', avg, locale) }),
+    translate('calories.balance.evidence.basedOn', { count }),
+  ];
   if (estimatedBurn !== null) {
-    evidence.push(`Estimated burn ${fmt('calories', estimatedBurn)} kcal`);
+    evidence.push(
+      translate('calories.balance.evidence.burn', {
+        calories: fmt('calories', estimatedBurn, locale),
+      }),
+    );
   }
   if (profile.dailyCalorieGoal !== undefined) {
-    evidence.push(`Your target ${fmt('calories', profile.dailyCalorieGoal)} kcal`);
+    evidence.push(
+      translate('calories.balance.evidence.target', {
+        calories: fmt('calories', profile.dailyCalorieGoal, locale),
+      }),
+    );
   }
 
   if (target === null) {
@@ -1171,13 +1384,13 @@ function ruleCalorieBalance(
       'calories.balance',
       'energy',
       'info',
-      'Intake logged, no target to compare against',
-      'Add your birth date, sex and height to your profile to estimate how much you burn per day.',
+      translate('calories.balance.title.noTarget'),
+      translate('calories.balance.summary.noTarget'),
       evidence,
       [
         {
-          title: 'Complete your profile',
-          detail: 'Height, birth date, sex and activity level let the app estimate your maintenance calories.',
+          title: translate('calories.balance.recNoTarget1.title'),
+          detail: translate('calories.balance.recNoTarget1.detail'),
         },
       ],
     );
@@ -1192,17 +1405,21 @@ function ruleCalorieBalance(
       'calories.balance',
       'energy',
       'critical',
-      'Eating far too little',
-      `You are averaging ${fmt('calories', avg)} kcal against an estimated need of ${fmt('calories', target)} - a deficit of ${fmt('calories', Math.abs(diff))} kcal per day.`,
+      translate('calories.balance.title.severeDeficit'),
+      translate('calories.balance.summary.severeDeficit', {
+        avg: fmt('calories', avg, locale),
+        target: fmt('calories', target, locale),
+        deficit: fmt('calories', Math.abs(diff), locale),
+      }),
       evidence,
       [
         {
-          title: 'Raise intake toward maintenance',
-          detail: 'Deficits beyond ~20-35% of needs bring fatigue, poor recovery and muscle loss.',
+          title: translate('calories.balance.recSevere1.title'),
+          detail: translate('calories.balance.recSevere1.detail'),
         },
         {
-          title: 'Get medical advice if this is long-term',
-          detail: 'Sustained very low intake should be supervised.',
+          title: translate('calories.balance.recSevere2.title'),
+          detail: translate('calories.balance.recSevere2.detail'),
         },
       ],
     );
@@ -1213,17 +1430,25 @@ function ruleCalorieBalance(
       'calories.balance',
       'energy',
       'warning',
-      'Large calorie deficit',
-      `You are eating about ${fmt('calories', Math.abs(diff))} kcal per day below your estimated need.`,
+      translate('calories.balance.title.largeDeficit'),
+      translate('calories.balance.summary.largeDeficit', {
+        calories: fmt('calories', Math.abs(diff), locale),
+      }),
       evidence,
       [
         {
-          title: 'Check protein intake',
-          detail: `Roughly ${fmt('weight', weight === null ? null : round(weight * 1.6, 0))} g per day keeps you in a deficit without losing muscle.`,
+          title: translate('calories.balance.recDeficit1.title'),
+          detail: translate('calories.balance.recDeficit1.detail', {
+            protein: fmt(
+              'weight',
+              weight === null ? null : round(weight * 1.6, 0),
+              locale,
+            ),
+          }),
         },
         {
-          title: 'Is the deficit deliberate?',
-          detail: 'If you are not actively cutting, this may simply be under-reporting.',
+          title: translate('calories.balance.recDeficit2.title'),
+          detail: translate('calories.balance.recDeficit2.detail'),
         },
       ],
     );
@@ -1234,17 +1459,19 @@ function ruleCalorieBalance(
       'calories.balance',
       'energy',
       'warning',
-      'Sustained calorie surplus',
-      `You are eating about ${fmt('calories', diff)} kcal per day above your estimated need.`,
+      translate('calories.balance.title.surplus'),
+      translate('calories.balance.summary.surplus', {
+        calories: fmt('calories', diff, locale),
+      }),
       evidence,
       [
         {
-          title: 'Trim 200 kcal rather than 500',
-          detail: 'Smaller cuts are far more likely to still be in place a month from now.',
+          title: translate('calories.balance.recSurplus1.title'),
+          detail: translate('calories.balance.recSurplus1.detail'),
         },
         {
-          title: 'Watch for the liquid and snack calories',
-          detail: 'This size of gap is usually beverages, nuts, or cooking oil.',
+          title: translate('calories.balance.recSurplus2.title'),
+          detail: translate('calories.balance.recSurplus2.detail'),
         },
       ],
     );
@@ -1255,13 +1482,16 @@ function ruleCalorieBalance(
       'calories.balance',
       'energy',
       'positive',
-      'Intake matches your estimated burn',
-      `You are averaging ${fmt('calories', avg)} kcal against a target of ${fmt('calories', target)}.`,
+      translate('calories.balance.title.matched'),
+      translate('calories.balance.summary.matched', {
+        avg: fmt('calories', avg, locale),
+        target: fmt('calories', target, locale),
+      }),
       evidence,
       [
         {
-          title: 'This is the right baseline',
-          detail: 'Adjust from here: add ~250 kcal for a gentle loss, subtract for a gentle gain.',
+          title: translate('calories.balance.recMatched1.title'),
+          detail: translate('calories.balance.recMatched1.detail'),
         },
       ],
     );
@@ -1271,29 +1501,41 @@ function ruleCalorieBalance(
     'calories.balance',
     'energy',
     'info',
-    Math.abs(ratio) < t.calorieDeficitRatio ? 'Mild calorie deficit' : 'Mild calorie surplus',
-    `Intake is ${fmt('calories', Math.abs(diff))} kcal per day ${ratio < 0 ? 'below' : 'above'} the ${fmt('calories', target)} kcal target.`,
+    translate(
+      Math.abs(ratio) < t.calorieDeficitRatio
+        ? 'calories.balance.title.mildDeficit'
+        : 'calories.balance.title.mildSurplus',
+    ),
+    translate(ratio < 0 ? 'calories.balance.summary.below' : 'calories.balance.summary.above', {
+      calories: fmt('calories', Math.abs(diff), locale),
+      target: fmt('calories', target, locale),
+    }),
     evidence,
     [
       {
-        title: 'Keep logging to confirm it sticks',
-        detail: 'A 3-4 week window is enough to see whether this shows up in your weight.',
+        title: translate('calories.balance.recMild1.title'),
+        detail: translate('calories.balance.recMild1.detail'),
       },
     ],
   );
 }
 
 /** Day-to-day swings in intake. */
-function ruleCalorieStability(summaries: Record<MetricKey, MetricSummary>): Insight | null {
+function ruleCalorieStability(
+  summaries: Record<MetricKey, MetricSummary>,
+  locale: Locale,
+  translate: InsightTranslator,
+): Insight | null {
   const { count, average, stdDev } = summaries.calories;
   if (count < MIN_DAYS_FOR_TREND) return null;
 
   const cv = variationRatio(average, stdDev);
   if (cv === null) return null;
 
+  const percent = formatNumber(round(cv, 0), 0, locale);
   const evidence = [
-    `Day-to-day variation ${round(cv, 0)}% (coefficient of variation)`,
-    `${count} days logged`,
+    translate('calories.stability.evidence.variation', { percent }),
+    translate('calories.stability.evidence.logged', { count }),
   ];
 
   if (cv <= THRESHOLDS.calorieIrregularCvPercent) {
@@ -1301,13 +1543,13 @@ function ruleCalorieStability(summaries: Record<MetricKey, MetricSummary>): Insi
       'calories.stability',
       'energy',
       'positive',
-      'Calorie intake is steady',
-      `Your daily intake varies by only ${round(cv, 0)}%, which is easy to reason about.`,
+      translate('calories.stability.title.steady'),
+      translate('calories.stability.summary.steady', { percent }),
       evidence,
       [
         {
-          title: 'Use the weekly total as the real number',
-          detail: 'Daily noise is normal; what matters is the average across the week.',
+          title: translate('calories.stability.recSteady1.title'),
+          detail: translate('calories.stability.recSteady1.detail'),
         },
       ],
     );
@@ -1317,17 +1559,17 @@ function ruleCalorieStability(summaries: Record<MetricKey, MetricSummary>): Insi
     'calories.stability',
     'energy',
     'warning',
-    'Erratic calorie intake',
-    `Your intake swings by ${round(cv, 0)}%, which usually means a restrict-and-binge cycle.`,
+    translate('calories.stability.title.erratic'),
+    translate('calories.stability.summary.erratic', { percent }),
     evidence,
     [
       {
-        title: 'Aim for consistency, not perfection',
-        detail: 'Keeping each day within ~200 kcal of the target beats one perfect day in five.',
+        title: translate('calories.stability.recErratic1.title'),
+        detail: translate('calories.stability.recErratic1.detail'),
       },
       {
-        title: 'Look for the weekend pattern',
-        detail: 'Two high days a week are fine; five high days a week are not.',
+        title: translate('calories.stability.recErratic2.title'),
+        detail: translate('calories.stability.recErratic2.detail'),
       },
     ],
   );
@@ -1341,6 +1583,8 @@ function ruleCalorieWeightAlignment(
   profile: Profile,
   summaries: Record<MetricKey, MetricSummary>,
   age: number | null,
+  locale: Locale,
+  translate: InsightTranslator,
 ): Insight | null {
   if (summaries.calories.count < MIN_DAYS_FOR_TREND) return null;
   if (summaries.weight.count < MIN_DAYS_FOR_TREND) return null;
@@ -1359,10 +1603,18 @@ function ruleCalorieWeightAlignment(
   const ratio = burn > 0 ? deviation / burn : 0;
 
   const evidence = [
-    `Observed weight trend ${weightTrend > 0 ? '+' : ''}${fmt('weight', weightTrend)} kg per week`,
-    `Intake that would explain it: ${fmt('calories', expectedIntake)} kcal per day`,
-    `Actually logged: ${fmt('calories', calorieAvg)} kcal per day`,
-    `Gap ${deviation > 0 ? '+' : ''}${fmt('calories', deviation)} kcal per day`,
+    translate('calories.weight-alignment.evidence.trend', {
+      trend: formatSigned(weightTrend, METRIC_DIGITS.weight, locale),
+    }),
+    translate('calories.weight-alignment.evidence.expected', {
+      calories: fmt('calories', expectedIntake, locale),
+    }),
+    translate('calories.weight-alignment.evidence.actual', {
+      calories: fmt('calories', calorieAvg, locale),
+    }),
+    translate('calories.weight-alignment.evidence.gap', {
+      gap: formatSigned(deviation, METRIC_DIGITS.calories, locale),
+    }),
   ];
 
   if (Math.abs(ratio) > THRESHOLDS.alignmentToleranceRatio) {
@@ -1370,17 +1622,19 @@ function ruleCalorieWeightAlignment(
       'calories.weight-alignment',
       'energy',
       'warning',
-      'Intake and weight change disagree',
-      `Your logged calories do not explain the weight trend - a ${fmt('calories', Math.abs(deviation))} kcal per day gap suggests logging accuracy, not metabolism.`,
+      translate('calories.weight-alignment.title.disagree'),
+      translate('calories.weight-alignment.summary.disagree', {
+        calories: fmt('calories', Math.abs(deviation), locale),
+      }),
       evidence,
       [
         {
-          title: 'Weigh portions for a week',
-          detail: 'Calorie apps miss oils, sauces and drinks, which are usually the gap.',
+          title: translate('calories.weight-alignment.recDisagree1.title'),
+          detail: translate('calories.weight-alignment.recDisagree1.detail'),
         },
         {
-          title: 'Compare weight trend against the weekly calorie average',
-          detail: 'The weekly total is far more reliable than any single day.',
+          title: translate('calories.weight-alignment.recDisagree2.title'),
+          detail: translate('calories.weight-alignment.recDisagree2.detail'),
         },
       ],
     );
@@ -1390,13 +1644,15 @@ function ruleCalorieWeightAlignment(
     'calories.weight-alignment',
     'energy',
     'positive',
-    'Calories and weight tell a consistent story',
-    `Your logged intake matches the weight change you are seeing, within ${fmt('calories', Math.abs(deviation))} kcal per day.`,
+    translate('calories.weight-alignment.title.consistent'),
+    translate('calories.weight-alignment.summary.consistent', {
+      calories: fmt('calories', Math.abs(deviation), locale),
+    }),
     evidence,
     [
       {
-        title: 'Trust your own data',
-        detail: 'Internal consistency is what makes the recommendations trustworthy.',
+        title: translate('calories.weight-alignment.recConsistent1.title'),
+        detail: translate('calories.weight-alignment.recConsistent1.detail'),
       },
     ],
   );
@@ -1411,6 +1667,10 @@ export interface AnalyzeOptions {
   referenceDate?: string;
   /** Length of the analysis window in days, ending at `referenceDate`. */
   windowDays?: number;
+  /** Locale used to format dates and numbers in insight text. Defaults to `en`. */
+  locale?: Locale;
+  /** Source of insight text. Defaults to the English translator. */
+  translate?: InsightTranslator;
 }
 
 export function analyzeHealth(
@@ -1420,6 +1680,8 @@ export function analyzeHealth(
 ): HealthReport {
   const referenceDate = options.referenceDate ?? toISODate(new Date());
   const windowDays = Math.max(1, options.windowDays ?? DEFAULT_WINDOW_DAYS);
+  const locale = options.locale ?? 'en';
+  const translate = options.translate ?? enInsightTranslator;
   const windowEnd = referenceDate;
   const windowStart = addDays(windowEnd, -(windowDays - 1));
 
@@ -1440,24 +1702,24 @@ export function analyzeHealth(
     if (insight) insights.push(insight);
   };
 
-  add(ruleInsufficientData(loggedDays, windowDays, windowStart, windowEnd));
-  add(ruleCoverage(loggedDays, windowDays));
-  add(ruleMissingMetrics(summaries));
-  add(ruleBmi(profile, summaries));
-  add(ruleWeightTrend(summaries));
-  add(ruleWeightGoal(profile, summaries, age));
-  add(ruleWeightForecast(profile, summaries, windowEntries, referenceDate));
-  add(ruleSleepAverage(profile, summaries));
-  add(ruleSleepRegularity(summaries));
-  add(ruleSleepWeightInteraction(summaries));
-  add(ruleSteps(profile, summaries));
-  add(ruleStepsTrend(summaries));
-  add(ruleActivityAverage(profile, summaries));
-  add(ruleActivityRegularity(summaries));
-  add(ruleActivityStepsAlignment(profile, summaries));
-  add(ruleCalorieBalance(profile, summaries, age));
-  add(ruleCalorieStability(summaries));
-  add(ruleCalorieWeightAlignment(profile, summaries, age));
+  add(ruleInsufficientData(loggedDays, windowDays, windowStart, windowEnd, locale, translate));
+  add(ruleCoverage(loggedDays, windowDays, locale, translate));
+  add(ruleMissingMetrics(summaries, locale, translate));
+  add(ruleBmi(profile, summaries, locale, translate));
+  add(ruleWeightTrend(summaries, locale, translate));
+  add(ruleWeightGoal(profile, summaries, age, locale, translate));
+  add(ruleWeightForecast(profile, summaries, windowEntries, referenceDate, locale, translate));
+  add(ruleSleepAverage(profile, summaries, locale, translate));
+  add(ruleSleepRegularity(summaries, locale, translate));
+  add(ruleSleepWeightInteraction(summaries, locale, translate));
+  add(ruleSteps(profile, summaries, locale, translate));
+  add(ruleStepsTrend(summaries, locale, translate));
+  add(ruleActivityAverage(profile, summaries, locale, translate));
+  add(ruleActivityRegularity(summaries, locale, translate));
+  add(ruleActivityStepsAlignment(profile, summaries, locale, translate));
+  add(ruleCalorieBalance(profile, summaries, age, locale, translate));
+  add(ruleCalorieStability(summaries, locale, translate));
+  add(ruleCalorieWeightAlignment(profile, summaries, age, locale, translate));
 
   const sorted = [...insights].sort((a, b) => {
     const bySeverity = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
@@ -1532,10 +1794,17 @@ export function scoreTimeline(
   const referenceDate = options.referenceDate ?? toISODate(new Date());
   const windowDays = Math.max(1, options.windowDays ?? DEFAULT_WINDOW_DAYS);
   const spanDays = Math.max(1, options.spanDays ?? windowDays);
+  const locale = options.locale ?? 'en';
+  const translate = options.translate ?? enInsightTranslator;
 
   const points: ScoreTimelinePoint[] = lastNDays(referenceDate, spanDays).map((date) => ({
     date,
-    score: analyzeHealth(entries, profile, { referenceDate: date, windowDays }).score,
+    score: analyzeHealth(entries, profile, {
+      referenceDate: date,
+      windowDays,
+      locale,
+      translate,
+    }).score,
   }));
 
   const current = points.length > 0 ? points[points.length - 1]!.score : null;

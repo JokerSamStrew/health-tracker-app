@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { I18nProvider } from '../i18n/context.tsx';
 import userEvent from '@testing-library/user-event';
 import { BackupPanel } from '../components/BackupPanel.tsx';
 import { EntryForm, formToEntries, formToEntry } from '../components/EntryForm.tsx';
@@ -19,6 +21,11 @@ import { DEFAULT_PROFILE } from '../types.ts';
 import type { DailyEntry, Insight, Profile } from '../types.ts';
 
 const REFERENCE = '2024-03-14';
+
+/** Components read their copy from context, so every render needs a provider. */
+function renderUI(element: ReactElement) {
+  return render(<I18nProvider>{element}</I18nProvider>);
+}
 
 // jsdom's Blob lacks `text()`, so read blobs through FileReader instead.
 function blobText(blob: Blob): Promise<string> {
@@ -53,7 +60,7 @@ describe('EntryForm', () => {
   it('saves an entry with the values entered', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.type(screen.getByLabelText(/weight/i), '81.4');
     await user.type(screen.getByLabelText(/^steps/i), '10500');
@@ -73,7 +80,7 @@ describe('EntryForm', () => {
   it('saves the physical activity rating', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.selectOptions(screen.getByLabelText(/physical activity/i), '3.5');
     await user.click(screen.getByRole('button', { name: /save entry/i }));
@@ -84,7 +91,7 @@ describe('EntryForm', () => {
   it('omits fields left blank', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.type(screen.getByLabelText(/^steps/i), '9000');
     await user.click(screen.getByRole('button', { name: /save entry/i }));
@@ -95,7 +102,7 @@ describe('EntryForm', () => {
   it('rejects out-of-range values', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     // METRIC_RANGES.steps.max is 200,000, so 250,000 is out of range.
     await user.type(screen.getByLabelText(/^steps/i), '250000');
@@ -108,7 +115,7 @@ describe('EntryForm', () => {
   it('requires at least one measurement', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.click(screen.getByRole('button', { name: /save entry/i }));
 
@@ -118,7 +125,7 @@ describe('EntryForm', () => {
 
   it('clears the fields after a successful save but keeps the date', async () => {
     const user = userEvent.setup();
-    render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
 
     const steps = screen.getByLabelText(/^steps/i);
     await user.type(steps, '9000');
@@ -132,7 +139,7 @@ describe('EntryForm', () => {
   it('resets without saving', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     const steps = screen.getByLabelText(/^steps/i);
     await user.type(steps, '9000');
@@ -143,7 +150,7 @@ describe('EntryForm', () => {
   });
 
   it('limits the date field to today and three years back', () => {
-    render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
     const date = screen.getByLabelText(/^date/i);
     expect(date).toHaveAttribute('max', REFERENCE);
     expect(date).toHaveAttribute('min', '2021-03-15');
@@ -152,7 +159,7 @@ describe('EntryForm', () => {
   it('logs a custom date range from one set of values', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.selectOptions(screen.getByLabelText('Period'), 'range');
     fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-03-11' } });
@@ -179,7 +186,7 @@ describe('EntryForm', () => {
   it('logs a range that crosses a month boundary', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.selectOptions(screen.getByLabelText('Period'), 'range');
     fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-03-30' } });
@@ -195,7 +202,7 @@ describe('EntryForm', () => {
   it('validates bulk entries exactly like a single day', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.selectOptions(screen.getByLabelText('Period'), 'range');
     fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-03-11' } });
@@ -211,7 +218,7 @@ describe('EntryForm', () => {
   it('rejects a range whose end precedes its start', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.selectOptions(screen.getByLabelText('Period'), 'range');
     fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-03-17' } });
@@ -226,7 +233,7 @@ describe('EntryForm', () => {
   it('rejects a range longer than 366 days', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.selectOptions(screen.getByLabelText('Period'), 'range');
     fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2024-01-01' } });
@@ -240,7 +247,7 @@ describe('EntryForm', () => {
 
   it('keeps the range pickers when resetting', async () => {
     const user = userEvent.setup();
-    render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
 
     await user.selectOptions(screen.getByLabelText('Period'), 'range');
     const steps = screen.getByLabelText(/^steps/i);
@@ -254,7 +261,7 @@ describe('EntryForm', () => {
   it('toggles mood tags on click', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={onSave} />);
 
     await user.click(screen.getByRole('button', { name: 'Happy' }));
     await user.click(screen.getByRole('button', { name: 'Anxious' }));
@@ -268,7 +275,7 @@ describe('EntryForm', () => {
 
   it('removes a mood tag when it is clicked a second time', async () => {
     const user = userEvent.setup();
-    render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
 
     const sad = screen.getByRole('button', { name: 'Sad' });
     await user.click(sad);
@@ -280,7 +287,7 @@ describe('EntryForm', () => {
 
   it('keeps the mood tags selected across a period switch', async () => {
     const user = userEvent.setup();
-    render(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
+    renderUI(<EntryForm defaultDate={REFERENCE} onSave={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: 'Calm' }));
     await user.selectOptions(screen.getByLabelText('Period'), 'range');
@@ -289,7 +296,7 @@ describe('EntryForm', () => {
   });
 
   it('pre-fills the form when editing an entry', () => {
-    render(
+    renderUI(
       <EntryForm
         defaultDate={REFERENCE}
         editingEntry={{
@@ -320,7 +327,7 @@ describe('EntryForm', () => {
   it('replaces the whole entry on save, dropping cleared fields', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(
+    renderUI(
       <EntryForm
         defaultDate={REFERENCE}
         editingEntry={{ date: '2024-03-10', steps: 9000, moods: ['Calm'] }}
@@ -341,7 +348,7 @@ describe('EntryForm', () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     const onCancelEdit = vi.fn();
-    render(
+    renderUI(
       <EntryForm
         defaultDate={REFERENCE}
         editingEntry={{ date: '2024-03-10', steps: 9000 }}
@@ -460,7 +467,7 @@ describe('SummaryCards', () => {
   });
 
   it('renders a card for each metric plus the score', () => {
-    render(<SummaryCards report={report} />);
+    renderUI(<SummaryCards report={report} />);
     expect(screen.getByText('Health score')).toBeInTheDocument();
     for (const label of ['Weight', 'Steps', 'Sleep', 'Physical activity', 'Calories']) {
       expect(screen.getByText(label)).toBeInTheDocument();
@@ -469,12 +476,12 @@ describe('SummaryCards', () => {
 
   it('shows a dash instead of a score when there is no data', () => {
     const empty = analyzeHealth([], {}, { referenceDate: REFERENCE });
-    render(<SummaryCards report={empty} />);
+    renderUI(<SummaryCards report={empty} />);
     expect(screen.getByText('Not enough data')).toBeInTheDocument();
   });
 
   it('renders the latest values with units', () => {
-    render(<SummaryCards report={report} />);
+    renderUI(<SummaryCards report={report} />);
     expect(screen.getByText('kg')).toBeInTheDocument();
     expect(screen.getByText('kcal')).toBeInTheDocument();
   });
@@ -486,7 +493,7 @@ describe('InsightsPanel', () => {
   });
 
   it('renders problems with evidence and recommendations', () => {
-    render(<InsightsPanel insights={report.insights} />);
+    renderUI(<InsightsPanel insights={report.insights} />);
 
     expect(screen.getByText(/Problems & notes/i)).toBeInTheDocument();
     expect(screen.getAllByText(/What the data shows/i).length).toBeGreaterThan(0);
@@ -494,7 +501,7 @@ describe('InsightsPanel', () => {
   });
 
   it('separates positives into their own group', () => {
-    render(<InsightsPanel insights={report.insights} />);
+    renderUI(<InsightsPanel insights={report.insights} />);
     expect(screen.getByText(/Working well/i)).toBeInTheDocument();
   });
 
@@ -510,17 +517,17 @@ describe('InsightsPanel', () => {
         recommendations: [{ title: 'a', detail: 'b' }],
       },
     ];
-    render(<InsightsPanel insights={positiveOnly} />);
+    renderUI(<InsightsPanel insights={positiveOnly} />);
     expect(screen.getByText(/no problems detected/i)).toBeInTheDocument();
   });
 
   it('has an empty state with no insights at all', () => {
-    render(<InsightsPanel insights={[]} />);
+    renderUI(<InsightsPanel insights={[]} />);
     expect(screen.getByText(/nothing to report yet/i)).toBeInTheDocument();
   });
 
   it('always shows the disclaimer', () => {
-    render(<InsightsPanel insights={report.insights} />);
+    renderUI(<InsightsPanel insights={report.insights} />);
     expect(screen.getByText(/not medical advice/i)).toBeInTheDocument();
   });
 });
@@ -528,7 +535,7 @@ describe('InsightsPanel', () => {
 describe('HistoryTable', () => {
   it('lists entries newest first', () => {
     const entries = makeEntries(3);
-    render(<HistoryTable entries={entries} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    renderUI(<HistoryTable entries={entries} onEdit={vi.fn()} onDelete={vi.fn()} />);
 
     const rows = screen.getAllByRole('row').slice(1);
     expect(rows[0]).toHaveTextContent('Mar 14');
@@ -536,7 +543,7 @@ describe('HistoryTable', () => {
   });
 
   it('shows a dash for missing metrics', () => {
-    render(
+    renderUI(
       <HistoryTable entries={[{ date: REFERENCE, weightKg: 80 }]} onEdit={vi.fn()} onDelete={vi.fn()} />,
     );
     const row = screen.getByRole('row', { name: /mar 14/i });
@@ -549,7 +556,7 @@ describe('HistoryTable', () => {
       { date: REFERENCE, steps: 9000, moods: ['High Energy'] },
       { date: '2024-03-13', steps: 4000, moods: ['Burned out'] },
     ];
-    render(<HistoryTable entries={entries} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    renderUI(<HistoryTable entries={entries} onEdit={vi.fn()} onDelete={vi.fn()} />);
 
     await user.type(screen.getByRole('searchbox'), 'burned');
 
@@ -561,7 +568,7 @@ describe('HistoryTable', () => {
     const user = userEvent.setup();
     const entries = makeEntries(1);
     const onEdit = vi.fn();
-    render(<HistoryTable entries={entries} onEdit={onEdit} onDelete={vi.fn()} />);
+    renderUI(<HistoryTable entries={entries} onEdit={onEdit} onDelete={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: /edit entry for/i }));
     expect(onEdit).toHaveBeenCalledWith(entries[0]!);
@@ -570,14 +577,14 @@ describe('HistoryTable', () => {
   it('confirms deletion by date', async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
-    render(<HistoryTable entries={makeEntries(1)} onEdit={vi.fn()} onDelete={onDelete} />);
+    renderUI(<HistoryTable entries={makeEntries(1)} onEdit={vi.fn()} onDelete={onDelete} />);
 
     await user.click(screen.getByRole('button', { name: /delete entry for/i }));
     expect(onDelete).toHaveBeenCalledWith(REFERENCE);
   });
 
   it('shows an empty state', () => {
-    render(<HistoryTable entries={[]} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    renderUI(<HistoryTable entries={[]} onEdit={vi.fn()} onDelete={vi.fn()} />);
     expect(screen.getByText(/no entries yet/i)).toBeInTheDocument();
   });
 });
@@ -603,7 +610,7 @@ describe('BackupPanel', () => {
       downloads.push(this.download);
     });
 
-    render(
+    renderUI(
       <BackupPanel
         entries={makeEntries(2)}
         profile={{ birthDate: '1994-03-14' }}
@@ -630,7 +637,7 @@ describe('BackupPanel', () => {
   it('confirms before importing a backup, then hands it to the parent', async () => {
     const user = userEvent.setup();
     const onImport = vi.fn();
-    render(
+    renderUI(
       <BackupPanel entries={[]} profile={{}} referenceDate={REFERENCE} onImport={onImport} />,
     );
 
@@ -658,7 +665,7 @@ describe('BackupPanel', () => {
   it('cancelling an import applies nothing', async () => {
     const user = userEvent.setup();
     const onImport = vi.fn();
-    render(
+    renderUI(
       <BackupPanel entries={[]} profile={{}} referenceDate={REFERENCE} onImport={onImport} />,
     );
 
@@ -678,7 +685,7 @@ describe('BackupPanel', () => {
   it('rejects a file that is not a backup', async () => {
     const user = userEvent.setup();
     const onImport = vi.fn();
-    render(
+    renderUI(
       <BackupPanel entries={[]} profile={{}} referenceDate={REFERENCE} onImport={onImport} />,
     );
 
@@ -696,7 +703,7 @@ describe('BackupPanel', () => {
 
 describe('ProfilePanel', () => {
   it('shows energy estimates once enough is known', () => {
-    render(
+    renderUI(
       <ProfilePanel
         profile={{ birthDate: '1994-03-14', sex: 'male', heightCm: 180 }}
         latestWeightKg={80}
@@ -714,7 +721,7 @@ describe('ProfilePanel', () => {
   });
 
   it('asks for the missing inputs when it cannot estimate', () => {
-    render(
+    renderUI(
       <ProfilePanel
         profile={{}}
         latestWeightKg={null}
@@ -729,7 +736,7 @@ describe('ProfilePanel', () => {
   it('reports profile changes', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(
+    renderUI(
       <ProfilePanel
         profile={{ birthDate: '1994-03-14', sex: 'male', heightCm: 180 }}
         latestWeightKg={80}
@@ -752,7 +759,7 @@ describe('ProfilePanel', () => {
   it('reports a new activity goal', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(
+    renderUI(
       <ProfilePanel
         profile={{ birthDate: '1994-03-14', sex: 'male', heightCm: 180 }}
         latestWeightKg={80}
@@ -775,7 +782,7 @@ describe('ProfilePanel', () => {
   it('requires a second click to delete everything', async () => {
     const user = userEvent.setup();
     const onClearAll = vi.fn();
-    render(
+    renderUI(
       <ProfilePanel
         profile={{}}
         latestWeightKg={null}
@@ -795,7 +802,7 @@ describe('ProfilePanel', () => {
   it('cancels the deletion', async () => {
     const user = userEvent.setup();
     const onClearAll = vi.fn();
-    render(
+    renderUI(
       <ProfilePanel
         profile={{}}
         latestWeightKg={null}
@@ -852,7 +859,7 @@ describe('TimeSeriesChart', () => {
   });
 
   it('renders the header stats', () => {
-    render(
+    renderUI(
       <TimeSeriesChart title="Weight" metric="weight" data={data} summary={report.summaries.weight} />,
     );
 
@@ -863,7 +870,7 @@ describe('TimeSeriesChart', () => {
   });
 
   it('draws the chart when there is data', () => {
-    const { container } = render(
+    const { container } = renderUI(
       <TimeSeriesChart title="Weight" metric="weight" data={data} summary={report.summaries.weight} />,
     );
 
@@ -872,7 +879,7 @@ describe('TimeSeriesChart', () => {
   });
 
   it('draws a goal reference line when given one', () => {
-    const { container } = render(
+    const { container } = renderUI(
       <TimeSeriesChart
         title="Weight"
         metric="weight"
@@ -887,7 +894,7 @@ describe('TimeSeriesChart', () => {
   });
 
   it('renders with the dark theme palette', () => {
-    const { container } = render(
+    const { container } = renderUI(
       <TimeSeriesChart
         title="Steps"
         metric="steps"
@@ -903,7 +910,7 @@ describe('TimeSeriesChart', () => {
 
   it('shows an empty state instead of a chart when nothing is logged', () => {
     const empty = analyzeHealth([], {}, { referenceDate: REFERENCE });
-    const { container } = render(
+    const { container } = renderUI(
       <TimeSeriesChart
         title="Sleep"
         metric="sleep"
@@ -958,7 +965,7 @@ describe('HealthScoreChart', () => {
   });
 
   it('renders the header stats', () => {
-    render(<HealthScoreChart timeline={timeline} />);
+    renderUI(<HealthScoreChart timeline={timeline} />);
 
     expect(screen.getByRole('heading', { name: 'Health score' })).toBeInTheDocument();
     expect(screen.getByText('Current')).toBeInTheDocument();
@@ -968,14 +975,14 @@ describe('HealthScoreChart', () => {
   });
 
   it('draws the chart when days are scored', () => {
-    const { container } = render(<HealthScoreChart timeline={timeline} />);
+    const { container } = renderUI(<HealthScoreChart timeline={timeline} />);
 
     expect(container.querySelector('.recharts-wrapper')).not.toBeNull();
     expect(container.querySelector('.recharts-line')).not.toBeNull();
   });
 
   it('renders with the dark theme palette', () => {
-    const { container } = render(<HealthScoreChart timeline={timeline} theme="dark" />);
+    const { container } = renderUI(<HealthScoreChart timeline={timeline} theme="dark" />);
 
     expect(screen.getByRole('heading', { name: 'Health score' })).toBeInTheDocument();
     expect(container.querySelector('.recharts-line')).not.toBeNull();
@@ -1005,7 +1012,7 @@ describe('HealthScoreChart', () => {
         },
       ],
     };
-    const { container } = render(<HealthScoreChart timeline={timeline} goal={goal} />);
+    const { container } = renderUI(<HealthScoreChart timeline={timeline} goal={goal} />);
 
     expect(screen.getByText('Goal', { selector: 'dt' })).toBeInTheDocument();
     expect(screen.getByText('91')).toBeInTheDocument();
@@ -1026,7 +1033,7 @@ describe('HealthScoreChart', () => {
       },
       limiting: [],
     };
-    const { container } = render(<HealthScoreChart timeline={timeline} goal={goal} />);
+    const { container } = renderUI(<HealthScoreChart timeline={timeline} goal={goal} />);
 
     expect(screen.queryByText('Goal', { selector: 'dt' })).toBeNull();
     expect(container.querySelector('.recharts-reference-line')).toBeNull();
@@ -1035,7 +1042,7 @@ describe('HealthScoreChart', () => {
 
   it('shows an empty state when no day could be scored', () => {
     const empty = scoreTimeline([], DEFAULT_PROFILE, { referenceDate: REFERENCE });
-    const { container } = render(<HealthScoreChart timeline={empty} />);
+    const { container } = renderUI(<HealthScoreChart timeline={empty} />);
 
     expect(screen.getByText(/not enough days logged/i)).toBeInTheDocument();
     expect(container.querySelector('.recharts-wrapper')).toBeNull();
@@ -1083,7 +1090,7 @@ describe('MoodChart', () => {
   });
 
   it('summarises how often each tag was logged in the window', () => {
-    render(<MoodChart counts={counts} windowStart="2024-03-12" windowEnd="2024-03-14" />);
+    renderUI(<MoodChart counts={counts} windowStart="2024-03-12" windowEnd="2024-03-14" />);
 
     expect(screen.getByRole('heading', { name: 'Mood tags' })).toBeInTheDocument();
     expect(screen.getByText('Happy')).toBeInTheDocument();
@@ -1095,14 +1102,14 @@ describe('MoodChart', () => {
   });
 
   it('draws a pie when tags were logged', () => {
-    const { container } = render(
+    const { container } = renderUI(
       <MoodChart counts={counts} windowStart="2024-03-12" windowEnd="2024-03-14" />,
     );
     expect(container.querySelector('.recharts-pie')).not.toBeNull();
   });
 
   it('shows an empty state when no tags were logged', () => {
-    const { container } = render(
+    const { container } = renderUI(
       <MoodChart counts={[]} windowStart="2024-03-12" windowEnd="2024-03-14" />,
     );
     expect(screen.getByText(/tag your days with moods/i)).toBeInTheDocument();
@@ -1114,7 +1121,7 @@ describe('ThemeToggle', () => {
   it('names the theme it would switch to and reports it', async () => {
     const user = userEvent.setup();
     const onToggle = vi.fn();
-    const { rerender } = render(<ThemeToggle theme="light" onToggle={onToggle} />);
+    const { rerender } = renderUI(<ThemeToggle theme="light" onToggle={onToggle} />);
 
     expect(screen.getByRole('button', { name: /switch to dark theme/i })).toBeInTheDocument();
     expect(screen.getByText('Dark')).toBeInTheDocument();
@@ -1123,7 +1130,11 @@ describe('ThemeToggle', () => {
     await user.click(screen.getByRole('button'));
     expect(onToggle).toHaveBeenCalledTimes(1);
 
-    rerender(<ThemeToggle theme="dark" onToggle={onToggle} />);
+    rerender(
+      <I18nProvider>
+        <ThemeToggle theme="dark" onToggle={onToggle} />
+      </I18nProvider>,
+    );
     expect(screen.getByRole('button', { name: /switch to light theme/i })).toBeInTheDocument();
     expect(screen.getByText('Light')).toBeInTheDocument();
     expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true');

@@ -9,11 +9,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { formatLongDate, formatShortDate } from '../lib/date.ts';
+import { useI18n, type I18n } from '../i18n/context.tsx';
 import type { GoalHealthScore, GoalTargets } from '../lib/goalscore.ts';
 import type { ScoreTimeline, ScoreTimelinePoint } from '../lib/insights.ts';
-import { formatMetric, formatSigned } from '../lib/stats.ts';
-import { METRIC_UNITS, type ThemeMode } from '../types.ts';
+import type { ThemeMode } from '../types.ts';
 
 export interface HealthScoreChartProps {
   /** Rolling scores, as returned by `scoreTimeline`. */
@@ -49,17 +48,17 @@ function scoreTrendClass(trendPerWeek: number | null): string {
 }
 
 /** One compact sentence listing what "every goal met" assumes, per metric. */
-function goalBasis(targets: GoalTargets): string {
+function goalBasis(targets: GoalTargets, { t, formatMetric }: I18n): string {
   const parts = [
-    `${formatMetric(targets.steps, 0)} ${METRIC_UNITS.steps} a day`,
-    `sleep ${formatMetric(targets.sleepQuality, 1)}${METRIC_UNITS.sleep}`,
-    `activity ${formatMetric(targets.activityRating, 1)}${METRIC_UNITS.activity}`,
+    t('chart.goal.steps', { value: formatMetric(targets.steps, 0) }),
+    t('chart.goal.sleep', { value: formatMetric(targets.sleepQuality, 1) }),
+    t('chart.goal.activity', { value: formatMetric(targets.activityRating, 1) }),
   ];
   if (targets.weightKg !== null) {
-    parts.push(`${formatMetric(targets.weightKg, 1)} ${METRIC_UNITS.weight} weight`);
+    parts.push(t('chart.goal.weight', { value: formatMetric(targets.weightKg, 1) }));
   }
   if (targets.calories !== null) {
-    parts.push(`${formatMetric(targets.calories, 0)} ${METRIC_UNITS.calories} a day`);
+    parts.push(t('chart.goal.calories', { value: formatMetric(targets.calories, 0) }));
   }
   return parts.join(', ');
 }
@@ -82,6 +81,7 @@ function ScoreTooltip({
   payload?: TooltipEntry[];
   goal?: GoalHealthScore;
 }) {
+  const { t, formatLongDate, formatMetric } = useI18n();
   const row = payload?.[0]?.payload;
   if (!active || !row) return null;
   return (
@@ -89,12 +89,12 @@ function ScoreTooltip({
       <p className="chart-tooltip__date">{formatLongDate(row.date)}</p>
       <ul>
         <li>
-          <span>Health score</span>
+          <span>{t('summary.healthScore')}</span>
           <strong>{row.score === null ? '—' : `${row.score}/100`}</strong>
         </li>
         {goal !== undefined && goal.score !== null ? (
           <li className="chart-tooltip__goal">
-            <span>Goal</span>
+            <span>{t('common.goal')}</span>
             <strong>{formatMetric(goal.score, 0)}/100</strong>
           </li>
         ) : null}
@@ -109,12 +109,14 @@ function HealthScoreChartBase({
   height = 260,
   theme = 'light',
 }: HealthScoreChartProps) {
+  const i18n = useI18n();
+  const { t, formatMetric, formatSigned, formatShortDate } = i18n;
   const tokens = AXIS_TOKENS[theme];
   const color = SCORE_COLORS[theme];
 
   const rows: ChartRow[] = useMemo(
     () => timeline.points.map((point) => ({ ...point, label: formatShortDate(point.date) })),
-    [timeline.points],
+    [timeline.points, formatShortDate],
   );
   const scoredDays = timeline.points.filter((point) => point.score !== null).length;
   const goalScoreValue = goal === undefined ? null : goal.score;
@@ -123,33 +125,35 @@ function HealthScoreChartBase({
     <section className="card chart-card" aria-labelledby="health-score-chart">
       <header className="chart-card__header">
         <div>
-          <h3 id="health-score-chart">Health score</h3>
+          <h3 id="health-score-chart">{t('summary.healthScore')}</h3>
           <p className="chart-card__subtitle">
             {scoredDays > 0
-              ? `${scoredDays} of ${timeline.points.length} days scored · trailing ${
-                  timeline.windowDays
-                }-day window`
-              : 'No data yet'}
+              ? t('chart.scoredDays', {
+                  scored: scoredDays,
+                  total: timeline.points.length,
+                  days: timeline.windowDays,
+                })
+              : t('common.noDataYet')}
           </p>
         </div>
         <dl className="chart-card__stats">
           <div>
-            <dt>Current</dt>
+            <dt>{t('chart.current')}</dt>
             <dd>{formatMetric(timeline.current, 0)}</dd>
           </div>
           <div>
-            <dt>Average</dt>
+            <dt>{t('common.average')}</dt>
             <dd>{formatMetric(timeline.average, 0)}</dd>
           </div>
           <div>
-            <dt>Trend/wk</dt>
+            <dt>{t('common.trendPerWeek')}</dt>
             <dd className={scoreTrendClass(timeline.trendPerWeek)}>
               {formatSigned(timeline.trendPerWeek, 1)}
             </dd>
           </div>
           {goalScoreValue !== null ? (
             <div>
-              <dt>Goal</dt>
+              <dt>{t('common.goal')}</dt>
               <dd>{formatMetric(goalScoreValue, 0)}</dd>
             </div>
           ) : null}
@@ -184,7 +188,7 @@ function HealthScoreChartBase({
                   stroke={tokens.guide}
                   strokeDasharray="4 4"
                   label={{
-                    value: 'Goal',
+                    value: t('common.goal'),
                     position: 'insideTopRight',
                     fontSize: 11,
                     fill: tokens.tick,
@@ -207,20 +211,17 @@ function HealthScoreChartBase({
           </ResponsiveContainer>
         </div>
       ) : (
-        <p className="chart-card__empty">
-          Not enough days logged in this window to score it yet. Log a few more days and the
-          timeline appears here.
-        </p>
+        <p className="chart-card__empty">{t('chart.notEnoughDays')}</p>
       )}
 
       {goal !== undefined && goalScoreValue !== null ? (
         <div className="chart-goal-note">
           <p>
-            The goal line is the score if every goal were met: {goalBasis(goal.targets)}.
+            {t('chart.goalNote', { basis: goalBasis(goal.targets, i18n) })}
           </p>
           {goal.limiting.length > 0 ? (
             <>
-              <p>It sits below 100 because:</p>
+              <p>{t('chart.goalBelow')}</p>
               <ul className="chart-goal-note__list">
                 {goal.limiting.map((insight) => (
                   <li key={insight.id}>{insight.summary}</li>

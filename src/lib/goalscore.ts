@@ -91,7 +91,9 @@ export function goalHealthScore(
     simulated.push(entry);
   }
 
-  const report = analyzeHealth(simulated, profile, { referenceDate, windowDays });
+  // Pass the whole options object through so the derived insights use the same
+  // locale and translator as the main report (the goal-note quotes them).
+  const report = analyzeHealth(simulated, profile, options);
 
   return {
     score: report.score,

@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { formatShortDate } from '../lib/date.ts';
+import { useI18n } from '../i18n/context.tsx';
 import type { MoodTagCount } from '../lib/moods.ts';
 import type { ThemeMode } from '../types.ts';
 
@@ -45,19 +45,20 @@ function MoodTooltip({
   active?: boolean;
   payload?: TooltipEntry[];
 }) {
+  const { t, formatNumber, moodLabel } = useI18n();
   const item = payload?.[0]?.payload;
   if (!active || !item) return null;
   return (
     <div className="chart-tooltip">
-      <p className="chart-tooltip__date">{item.tag}</p>
+      <p className="chart-tooltip__date">{moodLabel(item.tag)}</p>
       <ul>
         <li>
-          <span>Logged days</span>
+          <span>{t('chart.loggedDays')}</span>
           <strong>{item.count}</strong>
         </li>
         <li>
-          <span>Share</span>
-          <strong>{item.share.toFixed(PERCENT_DIGITS)}%</strong>
+          <span>{t('chart.share')}</span>
+          <strong>{formatNumber(item.share, PERCENT_DIGITS)}%</strong>
         </li>
       </ul>
     </div>
@@ -71,6 +72,7 @@ function MoodChartBase({
   height = 240,
   theme = 'light',
 }: MoodChartProps) {
+  const { t, plural, formatNumber, formatShortDate, moodLabel } = useI18n();
   const palette = TAG_COLORS[theme];
 
   const slices = useMemo(() => {
@@ -89,13 +91,26 @@ function MoodChartBase({
     <section className="card chart-card mood-card" aria-labelledby="mood-chart">
       <header className="chart-card__header">
         <div>
-          <h3 id="mood-chart">Mood tags</h3>
+          <h3 id="mood-chart">{t('chart.moodTags')}</h3>
           <p className="chart-card__subtitle">
             {slices.length > 0
-              ? `${slices.length} ${slices.length === 1 ? 'tag' : 'tags'} across ${taggedDays} tagged ${
-                  taggedDays === 1 ? 'day' : 'days'
-                } · ${formatShortDate(windowStart)} – ${formatShortDate(windowEnd)}`
-              : 'No mood tags in this window'}
+              ? t('chart.moodSubtitle', {
+                  count: slices.length,
+                  noun: plural(slices.length, {
+                    one: 'noun.tag.one',
+                    few: 'noun.tag.few',
+                    many: 'noun.tag.many',
+                  }),
+                  days: taggedDays,
+                  dayNoun: plural(taggedDays, {
+                    one: 'noun.day.one',
+                    few: 'noun.day.few',
+                    many: 'noun.day.many',
+                  }),
+                  start: formatShortDate(windowStart),
+                  end: formatShortDate(windowEnd),
+                })
+              : t('chart.noMoodTags')}
           </p>
         </div>
       </header>
@@ -106,7 +121,7 @@ function MoodChartBase({
             className="mood-card__pie"
             style={{ height }}
             role="img"
-            aria-label={`Mood tag distribution across ${taggedDays} tagged days`}
+            aria-label={t('chart.moodDistribution', { days: taggedDays })}
           >
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -138,18 +153,16 @@ function MoodChartBase({
                   style={{ background: slice.color }}
                   aria-hidden="true"
                 />
-                <span className="mood-card__legend-tag">{slice.tag}</span>
+                <span className="mood-card__legend-tag">{moodLabel(slice.tag)}</span>
                 <span className="mood-card__legend-value">
-                  {slice.count} ({slice.share.toFixed(PERCENT_DIGITS)}%)
+                  {slice.count} ({formatNumber(slice.share, PERCENT_DIGITS)}%)
                 </span>
               </li>
             ))}
           </ul>
         </div>
       ) : (
-        <p className="chart-card__empty">
-          Tag your days with moods to see how they are distributed across this window.
-        </p>
+        <p className="chart-card__empty">{t('chart.tagYourDays')}</p>
       )}
     </section>
   );

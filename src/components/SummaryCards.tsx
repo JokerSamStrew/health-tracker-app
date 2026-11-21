@@ -1,5 +1,5 @@
-import { METRIC_LABELS } from '../lib/insights.ts';
-import { formatMetric, formatNumber, formatSigned } from '../lib/stats.ts';
+import { useI18n, type I18n } from '../i18n/context.tsx';
+import type { TranslationKey } from '../i18n/strings.ts';
 import type { HealthReport, MetricKey } from '../types.ts';
 import { METRIC_KEYS, METRIC_UNITS } from '../types.ts';
 
@@ -15,6 +15,14 @@ const DIGITS: Record<MetricKey, number> = {
   calories: 0,
 };
 
+const METRIC_LABEL_KEYS: Record<MetricKey, TranslationKey> = {
+  weight: 'metric.weight',
+  steps: 'metric.steps',
+  sleep: 'metric.sleep',
+  activity: 'metric.activity',
+  calories: 'metric.calories',
+};
+
 /** Values where "down" is the desirable direction. */
 const LOWER_IS_BETTER: Partial<Record<MetricKey, boolean>> = { weight: true, calories: true };
 
@@ -25,29 +33,36 @@ function scoreTone(score: number | null): string {
   return 'bad';
 }
 
-function scoreLabel(score: number | null): string {
-  if (score === null) return 'Not enough data';
-  if (score >= 80) return 'Looking good';
-  if (score >= 55) return 'Needs attention';
-  return 'Action needed';
+function scoreLabel(score: number | null, t: I18n['t']): string {
+  if (score === null) return t('summary.notEnoughData');
+  if (score >= 80) return t('summary.lookingGood');
+  if (score >= 55) return t('summary.needsAttention');
+  return t('summary.actionNeeded');
 }
 
 export function SummaryCards({ report }: SummaryCardsProps) {
+  const { t, formatMetric, formatNumber, formatSigned } = useI18n();
   const { summaries, score, counts } = report;
 
   return (
-    <section className="summary" aria-label="Summary">
+    <section className="summary" aria-label={t('summary.ariaLabel')}>
       <article className="card summary__score">
-        <p className="summary__label">Health score</p>
+        <p className="summary__label">{t('summary.healthScore')}</p>
         <p className={`summary__score-value summary__score-value--${scoreTone(score)}`}>
           {score === null ? '—' : score}
           <span className="summary__score-max">/100</span>
         </p>
-        <p className="summary__hint">{scoreLabel(score)}</p>
+        <p className="summary__hint">{scoreLabel(score, t)}</p>
         <ul className="summary__counts">
-          <li className="badge badge--critical">{counts.critical} critical</li>
-          <li className="badge badge--warning">{counts.warning} warning</li>
-          <li className="badge badge--positive">{counts.positive} positive</li>
+          <li className="badge badge--critical">
+            {t('summary.critical', { count: counts.critical })}
+          </li>
+          <li className="badge badge--warning">
+            {t('summary.warning', { count: counts.warning })}
+          </li>
+          <li className="badge badge--positive">
+            {t('summary.positive', { count: counts.positive })}
+          </li>
         </ul>
       </article>
 
@@ -66,22 +81,24 @@ export function SummaryCards({ report }: SummaryCardsProps) {
         return (
           <article className="card summary__metric" key={key}>
             <p className="summary__label">
-              {METRIC_LABELS[key]}
+              {t(METRIC_LABEL_KEYS[key])}
               <span className="summary__unit">{METRIC_UNITS[key]}</span>
             </p>
             <p className="summary__metric-value">
               {formatMetric(summary.latest, digits)}
             </p>
             <p className={`summary__metric-change summary__metric-change--${changeTone}`}>
-              {change === null ? 'No change yet' : `${formatSigned(change, digits)} in window`}
+              {change === null
+                ? t('summary.noChangeYet')
+                : t('summary.inWindow', { value: formatSigned(change, digits) })}
             </p>
             <dl className="summary__metric-details">
               <div>
-                <dt>Avg</dt>
+                <dt>{t('summary.avg')}</dt>
                 <dd>{formatMetric(summary.average, digits)}</dd>
               </div>
               <div>
-                <dt>Range</dt>
+                <dt>{t('summary.range')}</dt>
                 <dd>
                   {summary.min === null || summary.max === null
                     ? '—'
@@ -89,11 +106,11 @@ export function SummaryCards({ report }: SummaryCardsProps) {
                 </dd>
               </div>
               <div>
-                <dt>Trend</dt>
+                <dt>{t('summary.trend')}</dt>
                 <dd>
                   {summary.trendPerWeek === null
                     ? '—'
-                    : `${formatSigned(summary.trendPerWeek, 2)}/wk`}
+                    : `${formatSigned(summary.trendPerWeek, 2)}${t('common.perWeek')}`}
                 </dd>
               </div>
             </dl>

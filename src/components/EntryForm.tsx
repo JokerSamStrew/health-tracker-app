@@ -1,12 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import {
-  addDays,
-  dateRange,
-  daysBetween,
-  formatShortDate,
-  fromISODate,
-  toISODate,
-} from '../lib/date.ts';
+import { useI18n, type I18n } from '../i18n/context.tsx';
+import type { TranslationKey } from '../i18n/strings.ts';
+import { addDays, dateRange, daysBetween, fromISODate, toISODate } from '../lib/date.ts';
 import {
   MAX_MOOD_TAGS,
   MOOD_TAG_GROUPS,
@@ -92,6 +87,32 @@ export const ACTIVITY_RATING_OPTIONS: Array<{ value: string; label: string }> = 
   { value: '5', label: '5 - Hard training' },
 ];
 
+/** Display keys parallel to the exported option lists; the numeric prefix is
+    rebuilt at render time so it stays identical in every language. */
+const SLEEP_RATING_KEYS: Array<{ value: string; key: TranslationKey }> = [
+  { value: '1', key: 'sleepRating.poor' },
+  { value: '1.5', key: 'sleepRating.poorToFair' },
+  { value: '2', key: 'sleepRating.fair' },
+  { value: '2.5', key: 'sleepRating.fairToGood' },
+  { value: '3', key: 'sleepRating.good' },
+  { value: '3.5', key: 'sleepRating.goodToGreat' },
+  { value: '4', key: 'sleepRating.great' },
+  { value: '4.5', key: 'sleepRating.greatToExcellent' },
+  { value: '5', key: 'sleepRating.excellent' },
+];
+
+const ACTIVITY_RATING_KEYS: Array<{ value: string; key: TranslationKey }> = [
+  { value: '1', key: 'activityRating.restDay' },
+  { value: '1.5', key: 'activityRating.veryLight' },
+  { value: '2', key: 'activityRating.light' },
+  { value: '2.5', key: 'activityRating.lightToModerate' },
+  { value: '3', key: 'activityRating.moderate' },
+  { value: '3.5', key: 'activityRating.moderateToActive' },
+  { value: '4', key: 'activityRating.active' },
+  { value: '4.5', key: 'activityRating.veryActive' },
+  { value: '5', key: 'activityRating.hardTraining' },
+];
+
 function emptyForm(today: string): FormState {
   return {
     period: 'day',
@@ -148,19 +169,19 @@ function parseNumber(raw: string): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-function validate(form: FormState): Partial<Record<keyof FormState, string>> {
+function validate(form: FormState, t: I18n['t']): Partial<Record<keyof FormState, string>> {
   const errors: Partial<Record<keyof FormState, string>> = {};
 
   if (form.period === 'day') {
-    if (!fromISODate(form.date)) errors.date = 'Pick a valid date.';
+    if (!fromISODate(form.date)) errors.date = t('validation.date');
   } else {
-    if (!fromISODate(form.start)) errors.start = 'Pick a valid start date.';
-    if (!fromISODate(form.end)) errors.end = 'Pick a valid end date.';
+    if (!fromISODate(form.start)) errors.start = t('validation.start');
+    if (!fromISODate(form.end)) errors.end = t('validation.end');
     const span = daysBetween(form.start, form.end);
     if (span !== null && span < 0) {
-      errors.end = 'End date must be on or after the start date.';
+      errors.end = t('validation.endAfterStart');
     } else if (span !== null && span + 1 > MAX_RANGE_DAYS) {
-      errors.end = `Maximum ${MAX_RANGE_DAYS} days per range.`;
+      errors.end = t('validation.maxRange', { max: MAX_RANGE_DAYS });
     }
   }
 
@@ -169,18 +190,18 @@ function validate(form: FormState): Partial<Record<keyof FormState, string>> {
     if (raw.trim() === '') continue;
     const value = parseNumber(raw);
     if (value === null) {
-      errors[field] = 'Enter a number.';
+      errors[field] = t('validation.number');
       continue;
     }
     const range = METRIC_RANGES[METRIC_FOR_FIELD[field]];
     if (value < range.min || value > range.max) {
-      errors[field] = `Must be between ${range.min} and ${range.max}.`;
+      errors[field] = t('validation.numberRange', { min: range.min, max: range.max });
     }
   }
 
   const hasValue = METRIC_FIELDS.some((field) => form[field].trim() !== '');
   if (!hasValue && form.moods.length === 0) {
-    errors.moods = 'Fill in at least one measurement.';
+    errors.moods = t('validation.measurement');
   }
 
   return errors;
@@ -221,6 +242,7 @@ export function formToEntries(form: FormState): DailyEntry[] {
 }
 
 export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEdit }: EntryFormProps) {
+  const { t, formatShortDate, moodLabel, moodGroupLabel } = useI18n();
   const today = defaultDate ?? toISODate(new Date());
   const [form, setForm] = useState<FormState>(() =>
     editingEntry ? formFromEntry(editingEntry) : emptyForm(today),
@@ -278,7 +300,7 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    const found = validate(form);
+    const found = validate(form, t);
     if (Object.keys(found).length > 0) {
       setErrors(found);
       setSaved(false);
@@ -294,32 +316,36 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
   }
 
   const savedMessage = editingEntry
-    ? 'Saved. Entry updated.'
+    ? t('entry.savedEdit')
     : form.period === 'day'
-      ? 'Saved. Values merged into that day.'
-      : `Saved. Applied to ${formToEntries(form).length} days in that range.`;
+      ? t('entry.savedDay')
+      : t('entry.savedRange', { count: formToEntries(form).length });
 
   return (
     <form className="card entry-form" onSubmit={handleSubmit} noValidate>
-      <h3>{editingEntry ? `Edit entry for ${formatShortDate(editingEntry.date)}` : 'Log an entry'}</h3>
+      <h3>
+        {editingEntry
+          ? t('entry.edit', { date: formatShortDate(editingEntry.date) })
+          : t('entry.log')}
+      </h3>
 
       <div className="entry-form__row">
         {editingEntry === null ? (
           <label className="field">
-            <span>Period</span>
+            <span>{t('entry.period')}</span>
             <select
               value={form.period}
               onChange={(event) => update('period', event.target.value as EntryPeriod)}
             >
-              <option value="day">Exact date</option>
-              <option value="range">Custom range</option>
+              <option value="day">{t('entry.exactDate')}</option>
+              <option value="range">{t('entry.customRange')}</option>
             </select>
           </label>
         ) : null}
 
         {editingEntry !== null || form.period === 'day' ? (
           <label className="field">
-            <span>Date</span>
+            <span>{t('entry.date')}</span>
             <input
               type="date"
               value={form.date}
@@ -340,7 +366,7 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
         ) : (
           <>
             <label className="field">
-              <span>Start</span>
+              <span>{t('entry.start')}</span>
               <input
                 type="date"
                 value={form.start}
@@ -357,7 +383,7 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
               ) : null}
             </label>
             <label className="field">
-              <span>End</span>
+              <span>{t('entry.end')}</span>
               <input
                 type="date"
                 value={form.end}
@@ -378,14 +404,12 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
       </div>
 
       {form.period !== 'day' ? (
-        <p className="entry-form__hint">
-          One set of values is applied to every day from Start to End, both included.
-        </p>
+        <p className="entry-form__hint">{t('entry.rangeHint')}</p>
       ) : null}
 
       <div className="entry-form__row">
         <label className="field">
-          <span>Weight (kg)</span>
+          <span>{t('entry.weight')}</span>
           <input
             type="number"
             inputMode="decimal"
@@ -406,7 +430,7 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
         </label>
 
         <label className="field">
-          <span>Steps</span>
+          <span>{t('entry.steps')}</span>
           <input
             type="number"
             inputMode="numeric"
@@ -429,17 +453,17 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
 
       <div className="entry-form__row">
         <label className="field">
-          <span>Sleep quality</span>
+          <span>{t('entry.sleepQuality')}</span>
           <select
             value={form.sleepQuality}
             onChange={(event) => update('sleepQuality', event.target.value)}
             aria-invalid={errors.sleepQuality ? 'true' : undefined}
             aria-describedby={errors.sleepQuality ? 'entry-sleep-error' : undefined}
           >
-            <option value="">Not set</option>
-            {SLEEP_QUALITY_OPTIONS.map((option) => (
+            <option value="">{t('common.notSet')}</option>
+            {SLEEP_RATING_KEYS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {option.value + ' - ' + t(option.key)}
               </option>
             ))}
           </select>
@@ -451,17 +475,17 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
         </label>
 
         <label className="field">
-          <span>Physical activity</span>
+          <span>{t('entry.activity')}</span>
           <select
             value={form.activityRating}
             onChange={(event) => update('activityRating', event.target.value)}
             aria-invalid={errors.activityRating ? 'true' : undefined}
             aria-describedby={errors.activityRating ? 'entry-activity-error' : undefined}
           >
-            <option value="">Not set</option>
-            {ACTIVITY_RATING_OPTIONS.map((option) => (
+            <option value="">{t('common.notSet')}</option>
+            {ACTIVITY_RATING_KEYS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {option.value + ' - ' + t(option.key)}
               </option>
             ))}
           </select>
@@ -473,7 +497,7 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
         </label>
 
         <label className="field">
-          <span>Calories eaten (kcal)</span>
+          <span>{t('entry.calories')}</span>
           <input
             type="number"
             inputMode="numeric"
@@ -497,15 +521,17 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
       <div
         className="entry-form__tags"
         role="group"
-        aria-label="Mood tags"
+        aria-label={t('entry.moods')}
         aria-describedby={errors.moods ? 'entry-moods-error' : undefined}
       >
         <p className="entry-form__tags-title">
-          Mood tags — click to toggle. Selected {form.moods.length} of {MAX_MOOD_TAGS}.
+          {t('entry.moodHint', { selected: form.moods.length, max: MAX_MOOD_TAGS })}
         </p>
         {MOOD_TAG_GROUPS.map((group) => (
           <div className="entry-form__tags-group" key={group.name}>
-            <span className="entry-form__tags-group-name">{group.name}</span>
+            <span className="entry-form__tags-group-name">
+              {moodGroupLabel(group.name, group.name)}
+            </span>
             {group.tags.map((tag) => {
               const selected = form.moods.some((item) => item.toLowerCase() === tag.toLowerCase());
               return (
@@ -516,7 +542,7 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
                   aria-pressed={selected}
                   onClick={() => toggleTag(tag)}
                 >
-                  {tag}
+                  {moodLabel(tag)}
                 </button>
               );
             })}
@@ -531,11 +557,11 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
 
       <div className="entry-form__actions">
         <button type="submit" className="button button--primary">
-          {editingEntry ? 'Update entry' : 'Save entry'}
+          {editingEntry ? t('entry.update') : t('entry.save')}
         </button>
         {editingEntry ? (
           <button type="button" className="button button--ghost" onClick={onCancelEdit}>
-            Cancel
+            {t('entry.cancel')}
           </button>
         ) : (
           <button
@@ -547,7 +573,7 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
               setSaved(false);
             }}
           >
-            Reset
+            {t('entry.reset')}
           </button>
         )}
         <span role="status" className="entry-form__status">

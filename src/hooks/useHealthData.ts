@@ -97,10 +97,10 @@ export function useHealthData(
     setRecovered(false);
   }, [storage]);
 
-  const { referenceDate, windowDays } = options;
+  const { referenceDate, windowDays, locale, translate } = options;
   const report = useMemo(
-    () => analyzeHealth(entries, profile, { referenceDate, windowDays }),
-    [entries, profile, referenceDate, windowDays],
+    () => analyzeHealth(entries, profile, { referenceDate, windowDays, locale, translate }),
+    [entries, profile, referenceDate, windowDays, locale, translate],
   );
 
   return {

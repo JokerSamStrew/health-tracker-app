@@ -13,13 +13,14 @@ import { isValidISODate } from './date.ts';
 import { normalizeMoods } from './moods.ts';
 import { mergeEntries, sortEntries } from './series.ts';
 import { METRIC_RANGES } from '../types.ts';
-import type { DailyEntry, Profile, ThemeMode } from '../types.ts';
+import type { DailyEntry, Locale, Profile, ThemeMode } from '../types.ts';
 
 export const STORAGE_KEYS = {
   entries: 'health-tracker:entries',
   profile: 'health-tracker:profile',
   version: 'health-tracker:version',
   theme: 'health-tracker:theme',
+  locale: 'health-tracker:locale',
 } as const;
 
 /** Bump when the persisted shape changes incompatibly. */
@@ -207,6 +208,18 @@ export function loadTheme(storage: StorageLike): ThemeMode | null {
 
 export function saveTheme(storage: StorageLike, theme: ThemeMode): void {
   storage.setItem(STORAGE_KEYS.theme, theme);
+}
+
+const LOCALES: readonly Locale[] = ['en', 'ru'];
+
+/** Reads the persisted language; `null` when absent or not a known value. */
+export function loadLocale(storage: StorageLike): Locale | null {
+  const raw = storage.getItem(STORAGE_KEYS.locale);
+  return (LOCALES as readonly string[]).includes(raw ?? '') ? (raw as Locale) : null;
+}
+
+export function saveLocale(storage: StorageLike, locale: Locale): void {
+  storage.setItem(STORAGE_KEYS.locale, locale);
 }
 
 export function clearState(storage: StorageLike): void {

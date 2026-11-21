@@ -3,7 +3,11 @@
  *
  * Everything is done in the local timezone and at noon to sidestep DST shifts,
  * because the app groups measurements by *calendar* day, not by elapsed hours.
+ * Display helpers take an explicit locale (English by default) so parsing and
+ * arithmetic stay independent of the UI language.
  */
+
+import type { Locale } from '../types.ts';
 
 export const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -83,18 +87,23 @@ const MONTH_SHORT = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
-/** `"2024-03-08"` -> `"Mar 8"`. Invalid input is returned unchanged. */
-export function formatShortDate(iso: string): string {
+const LOCALE_TAG: Record<Locale, string> = { en: 'en-US', ru: 'ru-RU' };
+
+/** `"2024-03-08"` -> `"Mar 8"` (en) or `"8 мар."` (ru). */
+export function formatShortDate(iso: string, locale: Locale = 'en'): string {
   const date = fromISODate(iso);
   if (!date) return iso;
+  if (locale === 'ru') {
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  }
   return `${MONTH_SHORT[date.getMonth()]} ${date.getDate()}`;
 }
 
-/** `"2024-03-08"` -> `"Fri, Mar 8, 2024"`. */
-export function formatLongDate(iso: string): string {
+/** Long, locale-specific date used in tooltips and accessible labels. */
+export function formatLongDate(iso: string, locale: Locale = 'en'): string {
   const date = fromISODate(iso);
   if (!date) return iso;
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString(LOCALE_TAG[locale], {
     weekday: 'short',
     year: 'numeric',
     month: 'short',

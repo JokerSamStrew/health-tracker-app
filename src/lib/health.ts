@@ -7,11 +7,13 @@
  * - TDEE: BMR * physical activity level (Harris-Benedict style multipliers)
  *
  * They are intentionally kept here, free of any UI or storage concerns, so the
- * insight engine and the tests can use them directly.
+ * insight engine and the tests can use them directly. Labels are resolved from
+ * the pure string tables in `src/i18n/`; that module has no React or DOM deps.
  */
 
+import { translate, type TranslationKey } from '../i18n/strings.ts';
 import { clamp } from './stats.ts';
-import type { ActivityLevel, Profile } from '../types.ts';
+import type { ActivityLevel, Locale, Profile } from '../types.ts';
 
 /** Multipliers applied to BMR to estimate total daily energy expenditure. */
 export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
@@ -30,6 +32,19 @@ export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   athlete: 'Athlete (physical job or 2x training daily)',
 };
 
+const ACTIVITY_LABEL_KEYS: Record<ActivityLevel, TranslationKey> = {
+  sedentary: 'activityLabel.sedentary',
+  light: 'activityLabel.light',
+  moderate: 'activityLabel.moderate',
+  active: 'activityLabel.active',
+  athlete: 'activityLabel.athlete',
+};
+
+/** Localised activity description; English is the default. */
+export function activityLabel(level: ActivityLevel, locale: Locale = 'en'): string {
+  return translate(locale, ACTIVITY_LABEL_KEYS[level]);
+}
+
 export type BmiCategory =
   | 'underweight'
   | 'healthy'
@@ -46,6 +61,20 @@ export const BMI_CATEGORIES: Record<BmiCategory, { label: string; max: number; m
   'obese-ii': { label: 'Obesity (class II)', min: 35, max: 40 },
   'obese-iii': { label: 'Obesity (class III)', min: 40, max: Number.POSITIVE_INFINITY },
 };
+
+const BMI_LABEL_KEYS: Record<BmiCategory, TranslationKey> = {
+  underweight: 'bmi.underweight',
+  healthy: 'bmi.healthy',
+  overweight: 'bmi.overweight',
+  'obese-i': 'bmi.obese-i',
+  'obese-ii': 'bmi.obese-ii',
+  'obese-iii': 'bmi.obese-iii',
+};
+
+/** Localised BMI band name; English is the default. */
+export function bmiLabel(category: BmiCategory, locale: Locale = 'en'): string {
+  return translate(locale, BMI_LABEL_KEYS[category]);
+}
 
 export function bmi(weightKg: number, heightCm: number): number | null {
   if (!Number.isFinite(weightKg) || !Number.isFinite(heightCm) || heightCm <= 0) return null;

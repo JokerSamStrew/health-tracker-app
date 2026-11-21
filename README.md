@@ -41,6 +41,10 @@ goal-tracking analysis.
 - **Dark theme** — light and dark themes, chosen by a header toggle, remembered
   across reloads, and pre-applied before first paint to avoid a flash. The OS
   color scheme is the default until you pick one.
+- **English / Russian** — a header toggle switches the whole interface, including
+  insights, mood labels and number/date formatting. The choice is remembered
+  across reloads and pre-applied before first paint. Mood tags stay in their
+  canonical English form in storage, so existing logs and backups keep working.
 - **Sample data** — one click seeds 90 deterministic days so the app can be
   explored without typing anything.
 
@@ -98,19 +102,27 @@ src/
     backup.ts            JSON export/import envelope for entries + profile
   hooks/
     useHealthData.ts     State + persistence + report memo
+    useLocale.ts         Language state, persistence, <html lang>
+  i18n/
+    strings.ts           UI dictionary (English keys define the API)
+    insightText.ts       Insight dictionary + pure translator
+    moodText.ts          Russian mood-tag display labels
+    context.tsx          I18nProvider and useI18n() for components
   components/            Presentational React components
   test/                  Unit tests, one file per lib module
 ```
 
 The `lib/` layer is deliberately pure: it never imports React, never touches
 `window` or the DOM, and takes `referenceDate` as an argument instead of
-reading the clock. That is what makes the analysis fully deterministic and
-testable.
+reading the clock. Translation is injected into the analysis engine and all
+formatting helpers take an explicit locale, so the language choice never makes
+the results non-deterministic.
 
 ## How the analysis works
 
-`analyzeHealth(entries, profile, { referenceDate, windowDays })` returns a
-`HealthReport`: per-metric summaries, a score, and a sorted list of insights.
+`analyzeHealth(entries, profile, { referenceDate, windowDays, locale, translate })`
+returns a `HealthReport`: per-metric summaries, a score, and a sorted list of
+insights. English is used when `locale`/`translate` are omitted.
 
 - The window ends on `referenceDate` and spans `windowDays` (default 14).
 - A rule only fires when there is enough data for it (3 logged days for
