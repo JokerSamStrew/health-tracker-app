@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../App.tsx';
 import { I18nProvider } from '../i18n/context.tsx';
@@ -90,5 +90,46 @@ describe('App', () => {
     expect(screen.getByLabelText(/calorie goal/i)).toHaveValue(2100);
     expect(screen.getByLabelText(/^step goal/i)).toHaveValue(12000);
     expect(screen.getByLabelText(/sleep goal/i)).toHaveValue(4.5);
+  });
+
+  it('warns before sample data replaces the existing log', async () => {
+    const user = userEvent.setup();
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    const backup = JSON.stringify({
+      format: 'health-tracker',
+      version: 1,
+      exportedAt: '2024-03-14T12:00:00.000Z',
+      entries: [{ date: '2024-03-10', steps: 9000 }],
+      profile: {},
+    });
+    await user.upload(
+      screen.getByLabelText(/backup file/i),
+      new File([backup], 'backup.json', { type: 'application/json' }),
+    );
+    await user.click(await screen.findByRole('button', { name: /replace with this file/i }));
+
+    const history = screen.getByRole('region', { name: /logged entries/i });
+    await waitFor(() => expect(within(history).getByText('1')).toBeInTheDocument());
+    expect(within(history).getByText('Mar 10')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /load sample data/i }));
+    expect(screen.getByRole('alert')).toHaveTextContent(/erases every logged entry/i);
+    // Nothing is replaced until the destructive action is confirmed.
+    expect(within(history).getByText('1')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(within(history).getByText('1')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /load sample data/i }));
+    await user.click(screen.getByRole('button', { name: /yes, load sample data/i }));
+
+    await waitFor(() => expect(within(history).getByText('90')).toBeInTheDocument());
+    expect(within(history).queryByText('Mar 10')).not.toBeInTheDocument();
   });
 });

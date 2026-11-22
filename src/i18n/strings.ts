@@ -42,6 +42,9 @@ const en = {
   'app.window': 'Window',
   'app.lastDays': 'Last {days} days',
   'app.loadSampleData': 'Load sample data',
+  'app.seedWarning':
+    'Loading sample data erases every logged entry and replaces it with 90 example days. This cannot be undone.',
+  'app.seedConfirm': 'Yes, load sample data',
   'app.recovered':
     'Stored data could not be read and was reset. Anything saved previously in this browser is gone.',
   'app.timelines': 'Timelines',
@@ -313,6 +316,9 @@ const ru: Record<TranslationKey, string> = {
   'app.window': 'Период',
   'app.lastDays': 'Последние {days} дн.',
   'app.loadSampleData': 'Загрузить пример',
+  'app.seedWarning':
+    'Загрузка примера удалит все записанные дни и заменит их 90 примерами. Отменить это нельзя.',
+  'app.seedConfirm': 'Да, загрузить пример',
   'app.recovered':
     'Не удалось прочитать сохранённые данные, и они были сброшены. Всё, что было записано ранее в этом браузере, потеряно.',
   'app.timelines': 'Графики',

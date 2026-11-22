@@ -49,8 +49,8 @@ goal-tracking analysis.
   insights, mood labels and number/date formatting. The choice is remembered
   across reloads and pre-applied before first paint. Mood tags stay in their
   canonical English form in storage, so existing logs and backups keep working.
-- **Sample data** — one click seeds 90 deterministic days so the app can be
-  explored without typing anything.
+- **Sample data** — a button at the end of the page seeds 90 deterministic days
+  after a confirmation warning, because it erases every logged entry.
 - **Section menu** — a compact **Sections** button opens
   links to every section, so you can jump to the charts, analysis or log without
   scrolling. It closes on selection, outside click or Escape.

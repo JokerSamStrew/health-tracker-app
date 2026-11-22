@@ -68,6 +68,7 @@ function generateDemoData(days: number, endDate: string): DailyEntry[] {
 export default function App() {
   const [windowDays, setWindowDays] = useState<number>(DEFAULT_WINDOW_DAYS);
   const [editingEntry, setEditingEntry] = useState<DailyEntry | null>(null);
+  const [confirmSeed, setConfirmSeed] = useState(false);
   // Bumped on import so the profile panel remounts and shows the imported
   // profile instead of the values it was seeded with on mount.
   const [profileRevision, setProfileRevision] = useState(0);
@@ -138,7 +139,11 @@ export default function App() {
   const weightTrend = report.summaries.weight.trendPerWeek;
 
   function handleSeed(): void {
+    // The demo replaces the log rather than piling onto it: the warning shown
+    // before this runs promises that existing entries are erased.
+    clearAll();
     for (const entry of generateDemoData(90, today)) upsertEntry(entry);
+    setConfirmSeed(false);
   }
 
   function handleImport(importedEntries: DailyEntry[], importedProfile: Profile): void {
@@ -175,9 +180,6 @@ export default function App() {
               ))}
             </select>
           </label>
-          <button type="button" className="button button--ghost" onClick={handleSeed}>
-            {t('app.loadSampleData')}
-          </button>
         </div>
       </header>
 
@@ -211,7 +213,6 @@ export default function App() {
                 : ''}
             </p>
           </div>
-          <GoalPlanPanel plan={goalPlan} goalDate={profile.goalDate} referenceDate={today} />
           <div className="charts__grid">
             <HealthScoreChart timeline={scoreTimelineData} goal={goalScore} theme={theme} />
             <TimeSeriesChart
@@ -262,6 +263,13 @@ export default function App() {
           </div>
         </section>
 
+        <GoalPlanPanel
+          id={SECTION_IDS.goalPlan}
+          plan={goalPlan}
+          goalDate={profile.goalDate}
+          referenceDate={today}
+        />
+
         <InsightsPanel id={SECTION_IDS.insights} insights={report.insights} />
 
         <div className="app__columns">
@@ -310,6 +318,36 @@ export default function App() {
               onImport={handleImport}
             />
           </div>
+        </div>
+
+        {/* Kept at the very end: loading the demo is destructive, so it should
+            not sit among the header's everyday controls. */}
+        <div className="app__sample">
+          {confirmSeed ? (
+            <div className="app__sample-confirm">
+              <p role="alert">{t('app.seedWarning')}</p>
+              <div className="app__sample-actions">
+                <button type="button" className="button button--danger" onClick={handleSeed}>
+                  {t('app.seedConfirm')}
+                </button>
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={() => setConfirmSeed(false)}
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => setConfirmSeed(true)}
+            >
+              {t('app.loadSampleData')}
+            </button>
+          )}
         </div>
       </main>
 

@@ -60,7 +60,11 @@ describe('Section menu', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
     const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(8);
+    expect(links).toHaveLength(9);
+    expect(screen.getByRole('link', { name: 'Goal pace' })).toHaveAttribute(
+      'href',
+      '#section-goal-plan',
+    );
     for (const link of links) {
       const href = link.getAttribute('href') ?? '';
       expect(href).toMatch(/^#section-/);
@@ -106,6 +110,10 @@ describe('Section menu', () => {
     expect(screen.getByRole('link', { name: 'Анализ' })).toHaveAttribute(
       'href',
       '#section-insights',
+    );
+    expect(screen.getByRole('link', { name: 'Темп к целям' })).toHaveAttribute(
+      'href',
+      '#section-goal-plan',
     );
   });
 });

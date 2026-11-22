@@ -226,6 +226,33 @@ code {
   min-width: 0;
 }
 
+.app__sample {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.app__sample-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 560px;
+  padding: 12px;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+}
+
+.app__sample-confirm p {
+  color: var(--warning);
+  font-size: 0.875rem;
+}
+
+.app__sample-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .app__footer {
   margin-top: 32px;
   padding-top: 16px;
@@ -1481,6 +1508,7 @@ input:focus-visible {
   }
 
   .app__header-actions,
+  .app__sample,
   .section-nav,
   .entry-form,
   .profile__danger,
