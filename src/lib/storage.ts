@@ -164,6 +164,9 @@ export function sanitizeProfile(value: unknown): Profile {
   const activityGoalRating = coerceOptionalNumber(value.activityGoalRating, 1, 5);
   if (activityGoalRating !== undefined) profile.activityGoalRating = activityGoalRating;
 
+  const goalDate = coerceString(value.goalDate, 10);
+  if (goalDate && isValidISODate(goalDate)) profile.goalDate = goalDate;
+
   return profile;
 }
 

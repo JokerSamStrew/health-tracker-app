@@ -38,6 +38,7 @@ type FormState = {
   heightCm: string;
   activityLevel: ActivityLevel;
   targetWeightKg: string;
+  goalDate: string;
   dailyCalorieGoal: string;
   dailyStepGoal: string;
   sleepGoalQuality: string;
@@ -52,6 +53,7 @@ function toFormState(profile: Profile): FormState {
     heightCm: profile.heightCm !== undefined ? String(profile.heightCm) : '',
     activityLevel: profile.activityLevel ?? 'moderate',
     targetWeightKg: profile.targetWeightKg !== undefined ? String(profile.targetWeightKg) : '',
+    goalDate: profile.goalDate ?? '',
     dailyCalorieGoal: profile.dailyCalorieGoal !== undefined ? String(profile.dailyCalorieGoal) : '',
     dailyStepGoal: profile.dailyStepGoal !== undefined ? String(profile.dailyStepGoal) : '',
     sleepGoalQuality: profile.sleepGoalQuality !== undefined ? String(profile.sleepGoalQuality) : '',
@@ -92,6 +94,11 @@ export function ProfilePanel({
     ...(optionalNumber(form.targetWeightKg) !== undefined
       ? { targetWeightKg: optionalNumber(form.targetWeightKg) }
       : {}),
+    // Unlike the older optional fields, an empty date must be sent as
+    // `undefined` so the stored deadline can actually be cleared.
+    ...(form.goalDate.trim() !== ''
+      ? { goalDate: form.goalDate.trim() }
+      : { goalDate: undefined }),
     ...(optionalNumber(form.dailyCalorieGoal) !== undefined
       ? { dailyCalorieGoal: optionalNumber(form.dailyCalorieGoal) }
       : {}),
@@ -220,6 +227,19 @@ export function ProfilePanel({
         </div>
 
         <div className="profile__row">
+          <label className="field">
+            <span>{t('profile.goalDate')}</span>
+            <input
+              type="date"
+              min={referenceDate}
+              value={form.goalDate}
+              placeholder="2024-12-31"
+              onChange={(event) => update('goalDate', event.target.value)}
+              onBlur={commit}
+            />
+            <small className="field__hint">{t('profile.goalDateHint')}</small>
+          </label>
+
           <label className="field">
             <span>{t('profile.calorieGoal')}</span>
             <input

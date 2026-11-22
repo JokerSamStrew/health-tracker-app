@@ -74,6 +74,8 @@ export interface Profile {
   sleepGoalQuality?: number;
   /** Daily physical activity target on a 1-5 scale. Defaults to 3. */
   activityGoalRating?: number;
+  /** ISO calendar date by which every goal above should be met. */
+  goalDate?: string;
 }
 
 export interface MetricSummary {

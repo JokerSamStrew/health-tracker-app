@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { BackupPanel } from './components/BackupPanel.tsx';
 import { EntryForm } from './components/EntryForm.tsx';
+import { GoalPlanPanel } from './components/GoalPlanPanel.tsx';
 import { HealthScoreChart } from './components/HealthScoreChart.tsx';
 import { HistoryTable } from './components/HistoryTable.tsx';
 import { InsightsPanel } from './components/InsightsPanel.tsx';
@@ -14,6 +15,7 @@ import { TimeSeriesChart } from './components/TimeSeriesChart.tsx';
 import { useHealthData } from './hooks/useHealthData.ts';
 import { useTheme } from './hooks/useTheme.ts';
 import { buildChartData } from './lib/charts.ts';
+import { buildGoalPlan } from './lib/goalplan.ts';
 import { goalHealthScore } from './lib/goalscore.ts';
 import { DEFAULT_WINDOW_DAYS, scoreTimeline } from './lib/insights.ts';
 import { countMoods } from './lib/moods.ts';
@@ -120,6 +122,13 @@ export default function App() {
     [profile, report.summaries, today, windowDays, locale, translate],
   );
 
+  // The deadline turns each goal into a required weekly pace; it follows the
+  // same window summaries and profile changes as the charts above.
+  const goalPlan = useMemo(
+    () => buildGoalPlan(profile, report.summaries, today),
+    [profile, report.summaries, today],
+  );
+
   const moodCounts = useMemo(
     () => countMoods(entries, report.windowStart, report.windowEnd),
     [entries, report.windowStart, report.windowEnd],
@@ -202,6 +211,7 @@ export default function App() {
                 : ''}
             </p>
           </div>
+          <GoalPlanPanel plan={goalPlan} goalDate={profile.goalDate} referenceDate={today} />
           <div className="charts__grid">
             <HealthScoreChart timeline={scoreTimelineData} goal={goalScore} theme={theme} />
             <TimeSeriesChart

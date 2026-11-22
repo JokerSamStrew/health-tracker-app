@@ -30,6 +30,10 @@ goal-tracking analysis.
 - **Mood tags** — tag any day with one or more moods from a grouped palette,
   and a pie chart above the timelines shows how often each tag was logged in
   the selected window.
+- **Goal deadline** — set a date in Profile & goals; the goal-pace card works
+  out the weekly change each goal needs from its latest logged value to that
+  date, compares it with the observed trend, and flags weight paces above the
+  safe 0.45 kg/week guide.
 - **Insight engine** — 18 rules across data quality, body composition, weight,
   recovery, activity and energy. Each insight shows the numbers it used
   (`evidence`) and what to do about it (`recommendations`).

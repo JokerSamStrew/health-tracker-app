@@ -63,6 +63,7 @@ describe('App', () => {
         heightCm: 170,
         activityLevel: 'active',
         targetWeightKg: 62.5,
+        goalDate: '2024-12-31',
         dailyCalorieGoal: 2100,
         dailyStepGoal: 12000,
         sleepGoalQuality: 4.5,
@@ -85,6 +86,7 @@ describe('App', () => {
     expect(screen.getByLabelText(/^height/i)).toHaveValue(170);
     expect(screen.getByLabelText(/activity level/i)).toHaveValue('active');
     expect(screen.getByLabelText(/target weight/i)).toHaveValue(62.5);
+    expect(screen.getByLabelText(/goal date/i)).toHaveValue('2024-12-31');
     expect(screen.getByLabelText(/calorie goal/i)).toHaveValue(2100);
     expect(screen.getByLabelText(/^step goal/i)).toHaveValue(12000);
     expect(screen.getByLabelText(/sleep goal/i)).toHaveValue(4.5);

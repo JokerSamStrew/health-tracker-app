@@ -140,6 +140,7 @@ describe('sanitizeProfile', () => {
       heightCm: 180,
       activityLevel: 'active',
       targetWeightKg: 78,
+      goalDate: ' 2024-12-31 ',
       dailyCalorieGoal: 2400,
       dailyStepGoal: 10000,
       sleepGoalQuality: 4.5,
@@ -152,6 +153,7 @@ describe('sanitizeProfile', () => {
       heightCm: 180,
       activityLevel: 'active',
       targetWeightKg: 78,
+      goalDate: '2024-12-31',
       dailyCalorieGoal: 2400,
       dailyStepGoal: 10000,
       sleepGoalQuality: 4.5,
@@ -183,6 +185,8 @@ describe('sanitizeProfile', () => {
 
   it('drops out-of-range values', () => {
     expect(sanitizeProfile({ birthDate: 'not-a-date' })).toEqual({});
+    expect(sanitizeProfile({ goalDate: '2024-02-31' })).toEqual({});
+    expect(sanitizeProfile({ goalDate: 'not-a-date' })).toEqual({});
     expect(sanitizeProfile({ heightCm: 400 })).toEqual({});
     expect(sanitizeProfile({ sleepGoalQuality: 6 })).toEqual({});
     expect(sanitizeProfile({ activityGoalRating: 6 })).toEqual({});

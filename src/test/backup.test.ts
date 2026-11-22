@@ -29,7 +29,12 @@ describe('buildBackup', () => {
 describe('parseBackup', () => {
   it('round-trips an export', () => {
     const entries = [{ date: '2024-03-01', steps: 9000, weightKg: 80 }];
-    const profile = { name: 'Sam', birthDate: '1994-03-14', sex: 'male' as const };
+    const profile = {
+      name: 'Sam',
+      birthDate: '1994-03-14',
+      sex: 'male' as const,
+      goalDate: '2024-12-31',
+    };
     const result = parseBackup(buildBackup(entries, profile, EXPORTED_AT));
 
     expect(result).toEqual({ entries, profile, dropped: 0 });

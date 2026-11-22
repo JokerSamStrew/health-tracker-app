@@ -5,6 +5,7 @@ import { I18nProvider } from '../i18n/context.tsx';
 import userEvent from '@testing-library/user-event';
 import { BackupPanel } from '../components/BackupPanel.tsx';
 import { EntryForm, formToEntries, formToEntry } from '../components/EntryForm.tsx';
+import { GoalPlanPanel } from '../components/GoalPlanPanel.tsx';
 import { HealthScoreChart } from '../components/HealthScoreChart.tsx';
 import { HistoryTable } from '../components/HistoryTable.tsx';
 import { InsightsPanel } from '../components/InsightsPanel.tsx';
@@ -15,6 +16,7 @@ import { ThemeToggle } from '../components/ThemeToggle.tsx';
 import { TimeSeriesChart } from '../components/TimeSeriesChart.tsx';
 import { analyzeHealth, scoreTimeline } from '../lib/insights.ts';
 import { buildChartData } from '../lib/charts.ts';
+import { buildGoalPlan } from '../lib/goalplan.ts';
 import type { GoalHealthScore } from '../lib/goalscore.ts';
 import { countMoods } from '../lib/moods.ts';
 import { DEFAULT_PROFILE } from '../types.ts';
@@ -779,6 +781,30 @@ describe('ProfilePanel', () => {
     expect(onChange.mock.calls.at(-1)![0].activityGoalRating).toBe(4);
   });
 
+  it('reports a goal date', () => {
+    const onChange = vi.fn();
+    renderUI(
+      <ProfilePanel
+        profile={{}}
+        latestWeightKg={null}
+        referenceDate={REFERENCE}
+        onChange={onChange}
+        onClearAll={vi.fn()}
+      />,
+    );
+
+    const date = screen.getByLabelText(/goal date/i);
+    fireEvent.change(date, { target: { value: '2024-12-31' } });
+    fireEvent.blur(date);
+
+    expect(onChange.mock.calls.at(-1)![0].goalDate).toBe('2024-12-31');
+
+    // Clearing it must overwrite the stored date, not leave the old value in place.
+    fireEvent.change(date, { target: { value: '' } });
+    fireEvent.blur(date);
+    expect(onChange.mock.calls.at(-1)![0].goalDate).toBeUndefined();
+  });
+
   it('requires a second click to delete everything', async () => {
     const user = userEvent.setup();
     const onClearAll = vi.fn();
@@ -817,6 +843,41 @@ describe('ProfilePanel', () => {
 
     expect(onClearAll).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /delete all data/i })).toBeInTheDocument();
+  });
+});
+
+describe('GoalPlanPanel', () => {
+  it('shows the deadline and the weekly pace for each goal', () => {
+    const profile: Profile = {
+      ...DEFAULT_PROFILE,
+      targetWeightKg: 80,
+      dailyCalorieGoal: 2200,
+      goalDate: '2024-05-09',
+    };
+    const report = analyzeHealth(makeEntries(14), profile, { referenceDate: REFERENCE });
+    const plan = buildGoalPlan(profile, report.summaries, REFERENCE)!;
+    renderUI(<GoalPlanPanel plan={plan} goalDate={profile.goalDate} referenceDate={REFERENCE} />);
+
+    expect(screen.getByText(/goal pace/i)).toBeInTheDocument();
+    expect(screen.getByText(/may 9, 2024/i)).toBeInTheDocument();
+    expect(screen.getByText(/56 days left/i)).toBeInTheDocument();
+    // 82.6 kg -> 80 kg in eight weeks is -0.325 kg/week, shown to one decimal.
+    expect(screen.getByText(/needed: -0.3 kg\/wk/i)).toBeInTheDocument();
+    expect(screen.getByText(/needed: -125 steps\/wk/i)).toBeInTheDocument();
+    expect(screen.getByText(/needed: -50 kcal\/wk/i)).toBeInTheDocument();
+    // Activity was never logged, so it has no row even though a goal exists.
+    expect(screen.getAllByRole('listitem')).toHaveLength(4);
+  });
+
+  it('explains a missing or past deadline', () => {
+    const { unmount } = renderUI(<GoalPlanPanel plan={null} referenceDate={REFERENCE} />);
+    expect(screen.getByText(/set a goal date/i)).toBeInTheDocument();
+    unmount();
+
+    renderUI(
+      <GoalPlanPanel plan={null} goalDate="2024-01-01" referenceDate={REFERENCE} />,
+    );
+    expect(screen.getByText(/that date is in the past/i)).toBeInTheDocument();
   });
 });
 
