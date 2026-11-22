@@ -60,7 +60,12 @@ describe('Section menu', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
     const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(9);
+    expect(links).toHaveLength(8);
+    // Moods now live inside the charts section rather than having their own.
+    expect(screen.queryByRole('link', { name: 'Mood tags' })).not.toBeInTheDocument();
+    expect(document.getElementById('section-moods')).toBeNull();
+    const chartGrid = document.querySelector('#section-charts .charts__grid');
+    expect(chartGrid).toContainElement(document.getElementById('mood-chart')!);
     expect(screen.getByRole('link', { name: 'Goal pace' })).toHaveAttribute(
       'href',
       '#section-goal-plan',

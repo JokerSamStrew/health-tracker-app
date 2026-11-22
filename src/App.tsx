@@ -192,14 +192,6 @@ export default function App() {
 
         <SummaryCards id={SECTION_IDS.summary} report={report} />
 
-        <MoodChart
-          id={SECTION_IDS.moods}
-          counts={moodCounts}
-          windowStart={report.windowStart}
-          windowEnd={report.windowEnd}
-          theme={theme}
-        />
-
         <section id={SECTION_IDS.charts} className="charts" aria-label={t('app.timelines')}>
           <div className="section-heading">
             <h2>{t('app.timelines')}</h2>
@@ -214,6 +206,12 @@ export default function App() {
             </p>
           </div>
           <div className="charts__grid">
+            <MoodChart
+              counts={moodCounts}
+              windowStart={report.windowStart}
+              windowEnd={report.windowEnd}
+              theme={theme}
+            />
             <HealthScoreChart timeline={scoreTimelineData} goal={goalScore} theme={theme} />
             <TimeSeriesChart
               title={t('metric.weight')}

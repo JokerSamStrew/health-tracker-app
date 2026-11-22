@@ -10,7 +10,6 @@ import type { TranslationKey } from '../i18n/strings.ts';
 
 export const SECTION_IDS = {
   summary: 'section-summary',
-  moods: 'section-moods',
   charts: 'section-charts',
   goalPlan: 'section-goal-plan',
   insights: 'section-insights',
@@ -22,7 +21,6 @@ export const SECTION_IDS = {
 
 const SECTION_LINKS: { id: string; label: TranslationKey }[] = [
   { id: SECTION_IDS.summary, label: 'summary.ariaLabel' },
-  { id: SECTION_IDS.moods, label: 'chart.moodTags' },
   { id: SECTION_IDS.charts, label: 'app.timelines' },
   { id: SECTION_IDS.goalPlan, label: 'goalPlan.title' },
   { id: SECTION_IDS.insights, label: 'insight.ariaLabel' },
