@@ -3,6 +3,8 @@ import type { TranslationKey } from '../i18n/strings.ts';
 import type { Insight, Severity } from '../types.ts';
 
 export interface InsightsPanelProps {
+  /** Anchor id used by the mobile section menu. */
+  id?: string;
   insights: Insight[];
   /** Show only problems by default. */
   showPositive?: boolean;
@@ -64,7 +66,7 @@ function InsightCard({ insight }: { insight: Insight }) {
   );
 }
 
-export function InsightsPanel({ insights, showPositive = false }: InsightsPanelProps) {
+export function InsightsPanel({ id, insights, showPositive = false }: InsightsPanelProps) {
   const { t } = useI18n();
   const problems = insights.filter((insight) => insight.severity !== 'positive');
   const positives = insights.filter((insight) => insight.severity === 'positive');
@@ -72,7 +74,7 @@ export function InsightsPanel({ insights, showPositive = false }: InsightsPanelP
 
   if (insights.length === 0) {
     return (
-      <section className="card insights" aria-label={t('insight.ariaLabel')}>
+      <section id={id} className="card insights" aria-label={t('insight.ariaLabel')}>
         <h3>{t('insight.title')}</h3>
         <p className="insights__empty">{t('insight.empty')}</p>
       </section>
@@ -80,7 +82,7 @@ export function InsightsPanel({ insights, showPositive = false }: InsightsPanelP
   }
 
   return (
-    <section className="insights" aria-label={t('insight.ariaLabel')}>
+    <section id={id} className="insights" aria-label={t('insight.ariaLabel')}>
       <div className="insights__group">
         <h3>
           {t('insight.problems')}

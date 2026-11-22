@@ -4,6 +4,8 @@ import { buildBackup, parseBackup, type ParsedBackup } from '../lib/backup.ts';
 import type { DailyEntry, Profile } from '../types.ts';
 
 export interface BackupPanelProps {
+  /** Anchor id used by the mobile section menu. */
+  id?: string;
   entries: DailyEntry[];
   profile: Profile;
   /** The app's "today" date, used only in the exported filename. */
@@ -14,7 +16,13 @@ export interface BackupPanelProps {
 
 type ImportStatus = { kind: 'idle' | 'success' | 'error'; message: string };
 
-export function BackupPanel({ entries, profile, referenceDate, onImport }: BackupPanelProps) {
+export function BackupPanel({
+  id,
+  entries,
+  profile,
+  referenceDate,
+  onImport,
+}: BackupPanelProps) {
   const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<ParsedBackup | null>(null);
@@ -70,7 +78,7 @@ export function BackupPanel({ entries, profile, referenceDate, onImport }: Backu
   }
 
   return (
-    <section className="card backup" aria-label={t('backup.ariaLabel')}>
+    <section id={id} className="card backup" aria-label={t('backup.ariaLabel')}>
       <h3>{t('backup.title')}</h3>
       <p className="backup__intro">{t('backup.intro')}</p>
 

@@ -47,6 +47,9 @@ goal-tracking analysis.
   canonical English form in storage, so existing logs and backups keep working.
 - **Sample data** — one click seeds 90 deterministic days so the app can be
   explored without typing anything.
+- **Section menu** — a compact **Sections** button opens
+  links to every section, so you can jump to the charts, analysis or log without
+  scrolling. It closes on selection, outside click or Escape.
 
 ## Stack
 

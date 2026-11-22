@@ -5,6 +5,8 @@ import type { MoodTagCount } from '../lib/moods.ts';
 import type { ThemeMode } from '../types.ts';
 
 export interface MoodChartProps {
+  /** Anchor id used by the mobile section menu. */
+  id?: string;
   /** Tag counts for the window, as returned by `countMoods`. */
   counts: MoodTagCount[];
   /** First day of the analysed window; shown in the subtitle. */
@@ -66,6 +68,7 @@ function MoodTooltip({
 }
 
 function MoodChartBase({
+  id,
   counts,
   windowStart,
   windowEnd,
@@ -88,7 +91,7 @@ function MoodChartBase({
   const taggedDays = slices.reduce((acc, slice) => acc + slice.count, 0);
 
   return (
-    <section className="card chart-card mood-card" aria-labelledby="mood-chart">
+    <section id={id} className="card chart-card mood-card" aria-labelledby="mood-chart">
       <header className="chart-card__header">
         <div>
           <h3 id="mood-chart">{t('chart.moodTags')}</h3>

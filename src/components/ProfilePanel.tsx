@@ -10,6 +10,8 @@ import {
 import type { ActivityLevel, Profile, Sex } from '../types.ts';
 
 export interface ProfilePanelProps {
+  /** Anchor id used by the mobile section menu. */
+  id?: string;
   profile: Profile;
   /** Latest logged weight, used to estimate burn. `null` when there is none. */
   latestWeightKg: number | null;
@@ -66,6 +68,7 @@ function optionalNumber(raw: string): number | undefined {
 }
 
 export function ProfilePanel({
+  id,
   profile,
   latestWeightKg,
   referenceDate,
@@ -122,7 +125,7 @@ export function ProfilePanel({
   }
 
   return (
-    <section className="card profile" aria-label={t('profile.ariaLabel')}>
+    <section id={id} className="card profile" aria-label={t('profile.ariaLabel')}>
       <h3>{t('profile.title')}</h3>
       <p className="profile__intro">{t('profile.intro')}</p>
 

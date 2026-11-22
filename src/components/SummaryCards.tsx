@@ -4,6 +4,8 @@ import type { HealthReport, MetricKey } from '../types.ts';
 import { METRIC_KEYS, METRIC_UNITS } from '../types.ts';
 
 export interface SummaryCardsProps {
+  /** Anchor id used by the mobile section menu. */
+  id?: string;
   report: HealthReport;
 }
 
@@ -40,12 +42,12 @@ function scoreLabel(score: number | null, t: I18n['t']): string {
   return t('summary.actionNeeded');
 }
 
-export function SummaryCards({ report }: SummaryCardsProps) {
+export function SummaryCards({ id, report }: SummaryCardsProps) {
   const { t, formatMetric, formatNumber, formatSigned } = useI18n();
   const { summaries, score, counts } = report;
 
   return (
-    <section className="summary" aria-label={t('summary.ariaLabel')}>
+    <section id={id} className="summary" aria-label={t('summary.ariaLabel')}>
       <article className="card summary__score">
         <p className="summary__label">{t('summary.healthScore')}</p>
         <p className={`summary__score-value summary__score-value--${scoreTone(score)}`}>

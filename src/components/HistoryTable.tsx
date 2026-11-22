@@ -6,6 +6,8 @@ import type { DailyEntry, MetricKey } from '../types.ts';
 import { METRIC_KEYS, METRIC_UNITS } from '../types.ts';
 
 export interface HistoryTableProps {
+  /** Anchor id used by the mobile section menu. */
+  id?: string;
   entries: DailyEntry[];
   onEdit: (entry: DailyEntry) => void;
   onDelete: (date: string) => void;
@@ -46,7 +48,7 @@ function cell(
   return formatMetric(value, DIGITS[key]);
 }
 
-export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
+export function HistoryTable({ id, entries, onEdit, onDelete }: HistoryTableProps) {
   const { t, formatMetric, formatLongDate, formatShortDate, moodLabel } = useI18n();
   const [query, setQuery] = useState('');
 
@@ -63,7 +65,7 @@ export function HistoryTable({ entries, onEdit, onDelete }: HistoryTableProps) {
   }, [sorted, query]);
 
   return (
-    <section className="card history" aria-label={t('history.ariaLabel')}>
+    <section id={id} className="card history" aria-label={t('history.ariaLabel')}>
       <header className="history__header">
         <h3>
           {t('history.title')}

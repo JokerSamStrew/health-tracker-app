@@ -5,6 +5,7 @@ import { HealthScoreChart } from './components/HealthScoreChart.tsx';
 import { HistoryTable } from './components/HistoryTable.tsx';
 import { InsightsPanel } from './components/InsightsPanel.tsx';
 import { LanguageToggle } from './components/LanguageToggle.tsx';
+import { SectionNav, SECTION_IDS } from './components/SectionNav.tsx';
 import { MoodChart } from './components/MoodChart.tsx';
 import { ProfilePanel } from './components/ProfilePanel.tsx';
 import { SummaryCards } from './components/SummaryCards.tsx';
@@ -178,16 +179,17 @@ export default function App() {
           </p>
         ) : null}
 
-        <SummaryCards report={report} />
+        <SummaryCards id={SECTION_IDS.summary} report={report} />
 
         <MoodChart
+          id={SECTION_IDS.moods}
           counts={moodCounts}
           windowStart={report.windowStart}
           windowEnd={report.windowEnd}
           theme={theme}
         />
 
-        <section className="charts" aria-label={t('app.timelines')}>
+        <section id={SECTION_IDS.charts} className="charts" aria-label={t('app.timelines')}>
           <div className="section-heading">
             <h2>{t('app.timelines')}</h2>
             <p>
@@ -250,13 +252,14 @@ export default function App() {
           </div>
         </section>
 
-        <InsightsPanel insights={report.insights} />
+        <InsightsPanel id={SECTION_IDS.insights} insights={report.insights} />
 
         <div className="app__columns">
           <div className="app__column">
             {/* Remount when the edit target changes so the form reloads cleanly. */}
             <EntryForm
               key={editingEntry ? editingEntry.date : 'new'}
+              id={SECTION_IDS.entry}
               defaultDate={today}
               editingEntry={editingEntry}
               onSave={(entry) => {
@@ -270,6 +273,7 @@ export default function App() {
               onCancelEdit={() => setEditingEntry(null)}
             />
             <HistoryTable
+              id={SECTION_IDS.history}
               entries={entries}
               onEdit={setEditingEntry}
               onDelete={(date) => {
@@ -281,6 +285,7 @@ export default function App() {
           <div className="app__column">
             <ProfilePanel
               key={profileRevision}
+              id={SECTION_IDS.profile}
               profile={profile}
               latestWeightKg={latestWeight}
               referenceDate={today}
@@ -288,6 +293,7 @@ export default function App() {
               onClearAll={clearAll}
             />
             <BackupPanel
+              id={SECTION_IDS.backup}
               entries={entries}
               profile={profile}
               referenceDate={today}
@@ -296,6 +302,8 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      <SectionNav />
 
       <footer className="app__footer">
         <p>

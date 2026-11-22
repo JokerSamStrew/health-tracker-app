@@ -11,6 +11,8 @@ import { METRIC_RANGES } from '../types.ts';
 import type { DailyEntry, MetricKey } from '../types.ts';
 
 export interface EntryFormProps {
+  /** Anchor id used by the mobile section menu. */
+  id?: string;
   /** Defaults to today. */
   defaultDate?: string;
   /** When set, the form edits this entry instead of logging a new one. */
@@ -241,7 +243,13 @@ export function formToEntries(form: FormState): DailyEntry[] {
   return dates.map((date) => formToEntry({ ...form, date }));
 }
 
-export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEdit }: EntryFormProps) {
+export function EntryForm({
+  id,
+  defaultDate,
+  editingEntry = null,
+  onSave,
+  onCancelEdit,
+}: EntryFormProps) {
   const { t, formatShortDate, moodLabel, moodGroupLabel } = useI18n();
   const today = defaultDate ?? toISODate(new Date());
   const [form, setForm] = useState<FormState>(() =>
@@ -322,7 +330,7 @@ export function EntryForm({ defaultDate, editingEntry = null, onSave, onCancelEd
       : t('entry.savedRange', { count: formToEntries(form).length });
 
   return (
-    <form className="card entry-form" onSubmit={handleSubmit} noValidate>
+    <form id={id} className="card entry-form" onSubmit={handleSubmit} noValidate>
       <h3>
         {editingEntry
           ? t('entry.edit', { date: formatShortDate(editingEntry.date) })
